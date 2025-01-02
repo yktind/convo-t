@@ -1,112 +1,121 @@
-from flask import Flask, request, redirect, url_for, render_template_string
+from flask import Flask, request, jsonify, redirect, url_for
 import os
+import re
 import time
 import requests
 from bs4 import BeautifulSoup as sop
-from concurrent.futures import ThreadPoolExecutor as Executor
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
+executor = ThreadPoolExecutor(max_workers=10)  # Limit parallel tasks
 
-# Display HTML form for input
-@app.route("/", methods=["GET", "POST"])
+def authenticate_cookie(cookie):
+    """Validate Facebook cookie."""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0'
+    }
+    response = requests.get("https://mbasic.facebook.com", cookies={"cookie": cookie}, headers=headers)
+    if "mbasic_logout_button" in response.text:
+        return True
+    return False
+
+def send_message(cookie, thread_id, message):
+    """Send a message to a Facebook thread."""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0',
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    try:
+        session = requests.Session()
+        # Access the thread
+        thread_url = f"https://mbasic.facebook.com/messages/read/?tid={thread_id}"
+        response = session.get(thread_url, cookies={"cookie": cookie}, headers=headers)
+        if response.status_code != 200:
+            raise Exception("Failed to access thread.")
+        
+        # Parse form details for message posting
+        soup = sop(response.text, "html.parser")
+        form = soup.find("form", method="post")
+        if not form:
+            raise Exception("Unable to locate the message form.")
+
+        # Collect required form data
+        payload = {inp["name"]: inp["value"] for inp in form.find_all("input") if inp.get("name")}
+        payload["body"] = message
+        payload["send"] = "Send"
+
+        # Send message
+        action_url = form["action"]
+        send_response = session.post(f"https://mbasic.facebook.com{action_url}", data=payload, headers=headers)
+        if "send" not in send_response.url:
+            raise Exception("Message failed.")
+        
+        return {"status": "success", "message": message}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.route('/', methods=['GET'])
 def index():
-    if request.method == "POST":
-        cookie = request.form.get("cookie").strip()
-        thread_id = request.form.get("thread_id").strip()
-        delay = int(request.form.get("delay", 5))
-        messages = request.form.get("messages").splitlines()
-
-        if not authenticate_user(cookie):
-            return "Login failed. Check your cookie."
-
-        with Executor(max_workers=5) as executor:
-            for message in messages:
-                executor.submit(send_message, cookie, thread_id, message.strip(), delay)
-        return "Messages sent successfully!"
-
-    # HTML Form
-    form_html = '''
+    """Return the main page."""
+    return '''
+    <!DOCTYPE html>
     <html>
     <head>
-        <title>Facebook Message Automation</title>
+        <title>Facebook Messenger Automation</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .container { max-width: 600px; margin: auto; padding: 20px; background: #f9f9f9; border-radius: 8px; }
-            input, textarea, button { width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-            button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-            button:hover { background-color: #45a049; }
+            body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 0; }
+            .container { max-width: 800px; margin: 50px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+            input, textarea, button { display: block; width: 100%; margin-bottom: 10px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+            button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+            button:hover { background: #45a049; }
         </style>
     </head>
     <body>
         <div class="container">
-            <h2>Facebook Message Automation</h2>
-            <form method="POST">
+            <h2>Facebook Messenger Automation</h2>
+            <form method="POST" action="/send-messages">
                 <label for="cookie">Facebook Cookie:</label>
-                <textarea name="cookie" rows="3" required></textarea>
+                <input type="text" id="cookie" name="cookie" placeholder="Enter your Facebook cookie" required>
                 
                 <label for="thread_id">Thread ID:</label>
-                <input type="text" name="thread_id" required>
-
-                <label for="messages">Messages (one per line):</label>
-                <textarea name="messages" rows="10" required></textarea>
+                <input type="text" id="thread_id" name="thread_id" placeholder="Enter the thread ID" required>
                 
-                <label for="delay">Delay Between Messages (seconds):</label>
-                <input type="number" name="delay" value="5" min="1" required>
+                <label for="message">Message:</label>
+                <textarea id="message" name="message" placeholder="Enter your message" required></textarea>
                 
-                <button type="submit">Send Messages</button>
+                <label for="delay">Delay (seconds):</label>
+                <input type="number" id="delay" name="delay" min="1" value="5" required>
+                
+                <button type="submit">Start Sending Messages</button>
             </form>
         </div>
     </body>
     </html>
     '''
-    return render_template_string(form_html)
 
-# Authenticate the user
-def authenticate_user(cookie):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0"
-    }
-    response = requests.get("https://mbasic.facebook.com", cookies={"cookie": cookie}, headers=headers)
-    return "mbasic_logout_button" in response.text
-
-# Send a message to the specified thread
-def send_message(cookie, thread_id, message, delay):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0",
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
+@app.route('/send-messages', methods=['POST'])
+def send_messages():
+    """Handle message-sending requests."""
     try:
-        response = requests.get(
-            f"https://mbasic.facebook.com/messages/read/?tid={thread_id}",
-            cookies={"cookie": cookie},
-            headers=headers
-        )
-        if response.status_code != 200:
-            raise Exception("Failed to load thread.")
+        cookie = request.form["cookie"].strip()
+        thread_id = request.form["thread_id"].strip()
+        message = request.form["message"].strip()
+        delay = int(request.form["delay"])
 
-        soup = sop(response.text, "html.parser")
-        form = soup.find("form", method="post")
-        if not form:
-            raise Exception("Form not found in response.")
+        if not authenticate_cookie(cookie):
+            return "Invalid Facebook Cookie. Please check and try again."
 
-        payload = {inp["name"]: inp["value"] for inp in form.find_all("input") if inp.get("name")}
-        payload.update({"body": message, "send": "Send"})
+        def message_worker():
+            for i in range(1, 6):  # Example loop: sends 5 messages
+                time.sleep(delay)
+                result = send_message(cookie, thread_id, f"{message} ({i})")
+                print(result)  # Log output for debugging
 
-        action_url = form["action"]
-        send_response = requests.post(
-            f"https://mbasic.facebook.com{action_url}",
-            data=payload,
-            cookies={"cookie": cookie},
-            headers=headers
-        )
-        if "send" in send_response.url:
-            print(f"Message sent: {message}")
-        else:
-            print(f"Failed to send message: {message}")
-        time.sleep(delay)
+        executor.submit(message_worker)
+        return "Message-sending process started in the background. Check the console for progress."
     except Exception as e:
-        print(f"Error: {e}")
+        return f"An error occurred: {e}"
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-    
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000, debug=True)
+        
