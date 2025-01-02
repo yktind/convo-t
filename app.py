@@ -1,150 +1,139 @@
-from flask import Flask, request, redirect, url_for, jsonify
-import os
-import time
-import re
+from flask import Flask, request, redirect, url_for
 import threading
+import time
 import requests
-from requests.exceptions import RequestException
+import os
 
 app = Flask(__name__)
 
-# Global control for stopping the loop
-stop_flag = False
+# Global variables for managing the sending process
+stop_flag = threading.Event()
+sending_thread = None
 
 @app.route('/', methods=['GET'])
 def index():
     return '''
-    <html>
+    <html lang="en">
     <head>
-        <title>Facebook Messenger Automation</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Facebook Message Sender</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-            .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-            input, button, textarea { width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-            button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-            button:hover { background-color: #45a049; }
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                padding: 20px;
+            }
+            .container {
+                max-width: 600px;
+                margin: auto;
+                background: #fff;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }
+            input, button {
+                width: 100%;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+                border: 1px solid #ccc;
+            }
+            button {
+                background-color: #4CAF50;
+                color: white;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #45a049;
+            }
         </style>
     </head>
     <body>
         <div class="container">
-            <h2>Facebook Messenger Automation</h2>
-            <form method="POST" action="/" enctype="multipart/form-data">
-                <label for="cookiesFile">Cookies File (TXT):</label>
-                <input type="file" name="cookiesFile" required>
-                
-                <label for="messagesFile">Messages File (TXT):</label>
-                <input type="file" name="messagesFile" required>
-                
+            <h2>Facebook Message Sender</h2>
+            <form action="/" method="post" enctype="multipart/form-data">
                 <label for="conversationId">Conversation ID:</label>
-                <input type="text" name="conversationId" placeholder="Enter group/inbox ID" required>
+                <input type="text" id="conversationId" name="conversationId" required>
                 
-                <label for="delay">Delay (seconds):</label>
-                <input type="number" name="delay" value="5" min="1" required>
+                <label for="token">Access Token:</label>
+                <input type="text" id="token" name="token" required>
                 
-                <button type="submit">Start Messaging</button>
+                <label for="messageFile">Messages File (TXT):</label>
+                <input type="file" id="messageFile" name="messageFile" accept=".txt" required>
+                
+                <label for="delay">Delay (Seconds):</label>
+                <input type="number" id="delay" name="delay" value="5" min="1" required>
+                
+                <button type="submit" name="start">Start</button>
             </form>
-            <form method="POST" action="/stop">
-                <button type="submit" style="background-color: red;">Stop Messaging</button>
+            <form action="/stop" method="post" style="margin-top: 20px;">
+                <button type="submit" style="background-color: red;">Stop</button>
             </form>
         </div>
     </body>
     </html>
     '''
 
-@app.route('/', methods=['POST'])
-def start_messaging():
+def send_messages(conversation_id, token, messages, delay):
     global stop_flag
-    stop_flag = False  # Reset the stop flag
 
-    try:
-        cookies_file = request.files['cookiesFile']
-        messages_file = request.files['messagesFile']
-        conversation_id = request.form['conversationId']
-        delay = int(request.form['delay'])
+    url = f"https://graph.facebook.com/v15.0/{conversation_id}/messages"
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
 
-        cookies_data = cookies_file.read().decode().splitlines()
-        messages = messages_file.read().decode().splitlines()
+    for i, message in enumerate(messages):
+        if stop_flag.is_set():
+            print("Message sending stopped.")
+            break
 
-        # Validate cookies and extract EAAG tokens
-        valid_cookies = get_valid_cookies(cookies_data)
-        if not valid_cookies:
-            return 'No valid cookies found. Please check the cookies file.'
+        data = {
+            "messaging_type": "RESPONSE",
+            "message": {"text": message}
+        }
 
-        # Start messaging in a separate thread
-        thread = threading.Thread(
-            target=send_messages,
-            args=(valid_cookies, messages, conversation_id, delay)
-        )
-        thread.start()
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 200:
+                print(f"[{i + 1}/{len(messages)}] Message sent: {message}")
+            else:
+                print(f"[{i + 1}/{len(messages)}] Failed to send: {response.text}")
+        except Exception as e:
+            print(f"[{i + 1}/{len(messages)}] Exception: {e}")
 
-    except Exception as e:
-        return f"Error: {str(e)}"
-    
+        time.sleep(delay)
+
+@app.route('/', methods=['POST'])
+def start_sending():
+    global sending_thread, stop_flag
+
+    conversation_id = request.form.get('conversationId')
+    token = request.form.get('token')
+    delay = int(request.form.get('delay'))
+
+    message_file = request.files['messageFile']
+    messages = message_file.read().decode().splitlines()
+
+    # Reset stop flag
+    stop_flag.clear()
+
+    # Start the message sending process in a separate thread
+    sending_thread = threading.Thread(target=send_messages, args=(conversation_id, token, messages, delay))
+    sending_thread.start()
+
     return redirect(url_for('index'))
 
 @app.route('/stop', methods=['POST'])
-def stop_messaging():
+def stop_sending():
     global stop_flag
-    stop_flag = True  # Set the stop flag to True to halt the process
+
+    # Set the stop flag to interrupt the message sending process
+    stop_flag.set()
+
     return redirect(url_for('index'))
-
-def get_valid_cookies(cookies_data):
-    valid_cookies = []
-    headers = {
-        'User-Agent': (
-            'Mozilla/5.0 (Linux; Android 11; RMX2144 Build/RKQ1.201217.002; wv) '
-            'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/103.0.5060.71 '
-            'Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/375.1.0.28.111;]'
-        )
-    }
-
-    for cookie in cookies_data:
-        response = make_request('https://business.facebook.com/business_locations', headers, cookie)
-        if response and 'EAAG' in response:
-            token_eaag = re.search(r'(EAAG\w+)', response)
-            if token_eaag:
-                valid_cookies.append((cookie, token_eaag.group(1)))
-    return valid_cookies
-
-def make_request(url, headers, cookie):
-    try:
-        response = requests.get(url, headers=headers, cookies={'Cookie': cookie})
-        return response.text
-    except RequestException as e:
-        print(f'[!] Error making request: {e}')
-        return None
-
-def send_messages(valid_cookies, messages, conversation_id, delay):
-    global stop_flag
-    message_index, cookie_index = 0, 0
-
-    while not stop_flag:
-        time.sleep(delay)
-        message = messages[message_index].strip()
-        current_cookie, token_eaag = valid_cookies[cookie_index]
-
-        response = send_message(conversation_id, message, current_cookie, token_eaag)
-        if response and response.status_code == 200:
-            print(f'Successfully sent message: {message}')
-            message_index = (message_index + 1) % len(messages)
-            cookie_index = (cookie_index + 1) % len(valid_cookies)
-        else:
-            print(f'Failed to send message: {message}')
-            cookie_index = (cookie_index + 1) % len(valid_cookies)
-
-def send_message(conversation_id, message, cookie, token_eaag):
-    data = {'message': message, 'access_token': token_eaag}
-    try:
-        response = requests.post(
-            f'https://graph.facebook.com/{conversation_id}/messages',
-            data=data,
-            cookies={'Cookie': cookie}
-        )
-        return response
-    except RequestException as e:
-        print(f'[!] Error sending message: {e}')
-        return None
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-        
+    
