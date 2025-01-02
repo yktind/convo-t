@@ -1,120 +1,112 @@
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request, redirect, url_for, render_template_string
 import os
 import time
 import requests
-from requests.exceptions import RequestException
+from bs4 import BeautifulSoup as sop
+from concurrent.futures import ThreadPoolExecutor as Executor
 
 app = Flask(__name__)
 
-# Replace with your Facebook App credentials
-APP_ID = 'your_app_id'
-APP_SECRET = 'your_app_secret'
-ACCESS_TOKEN = 'your_access_token'
-
-
-@app.route('/', methods=['GET'])
+# Display HTML form for input
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return '''
+    if request.method == "POST":
+        cookie = request.form.get("cookie").strip()
+        thread_id = request.form.get("thread_id").strip()
+        delay = int(request.form.get("delay", 5))
+        messages = request.form.get("messages").splitlines()
+
+        if not authenticate_user(cookie):
+            return "Login failed. Check your cookie."
+
+        with Executor(max_workers=5) as executor:
+            for message in messages:
+                executor.submit(send_message, cookie, thread_id, message.strip(), delay)
+        return "Messages sent successfully!"
+
+    # HTML Form
+    form_html = '''
     <html>
     <head>
-        <title>Facebook Inbox Message Automation</title>
+        <title>Facebook Message Automation</title>
         <style>
-            body { 
-                font-family: Arial, sans-serif; 
-                margin: 20px; 
-                background-color: #f4f4f9; 
-            }
-            .container { 
-                max-width: 800px; 
-                margin: auto; 
-                background: white; 
-                padding: 20px; 
-                border-radius: 8px; 
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); 
-            }
-            input, button, textarea { 
-                width: 100%; 
-                margin-bottom: 10px; 
-                padding: 10px; 
-                border: 1px solid #ccc; 
-                border-radius: 5px; 
-            }
-            button { 
-                background-color: #4CAF50; 
-                color: white; 
-                border: none; 
-                cursor: pointer; 
-            }
-            button:hover { 
-                background-color: #45a049; 
-            }
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .container { max-width: 600px; margin: auto; padding: 20px; background: #f9f9f9; border-radius: 8px; }
+            input, textarea, button { width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+            button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+            button:hover { background-color: #45a049; }
         </style>
     </head>
     <body>
         <div class="container">
-            <h2>Facebook Inbox Message Automation</h2>
-            <form method="POST" action="/" enctype="multipart/form-data">
-                <label for="recipientId">Recipient ID:</label>
-                <input type="text" name="recipientId" placeholder="Enter recipient's Facebook ID" required>
+            <h2>Facebook Message Automation</h2>
+            <form method="POST">
+                <label for="cookie">Facebook Cookie:</label>
+                <textarea name="cookie" rows="3" required></textarea>
                 
-                <label for="messagesFile">Messages File (TXT):</label>
-                <input type="file" name="messagesFile" required>
+                <label for="thread_id">Thread ID:</label>
+                <input type="text" name="thread_id" required>
+
+                <label for="messages">Messages (one per line):</label>
+                <textarea name="messages" rows="10" required></textarea>
                 
-                <label for="delay">Delay (seconds):</label>
+                <label for="delay">Delay Between Messages (seconds):</label>
                 <input type="number" name="delay" value="5" min="1" required>
                 
-                <button type="submit">Start Sending Messages</button>
+                <button type="submit">Send Messages</button>
             </form>
         </div>
     </body>
     </html>
     '''
+    return render_template_string(form_html)
 
+# Authenticate the user
+def authenticate_user(cookie):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0"
+    }
+    response = requests.get("https://mbasic.facebook.com", cookies={"cookie": cookie}, headers=headers)
+    return "mbasic_logout_button" in response.text
 
-@app.route('/', methods=['POST'])
-def send_messages():
+# Send a message to the specified thread
+def send_message(cookie, thread_id, message, delay):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
     try:
-        recipient_id = request.form['recipientId']
-        delay = int(request.form['delay'])
-        messages_file = request.files['messagesFile']
-        messages = messages_file.read().decode().splitlines()
+        response = requests.get(
+            f"https://mbasic.facebook.com/messages/read/?tid={thread_id}",
+            cookies={"cookie": cookie},
+            headers=headers
+        )
+        if response.status_code != 200:
+            raise Exception("Failed to load thread.")
 
-        headers = {
-            'Authorization': f'Bearer {ACCESS_TOKEN}',
-            'Content-Type': 'application/json'
-        }
+        soup = sop(response.text, "html.parser")
+        form = soup.find("form", method="post")
+        if not form:
+            raise Exception("Form not found in response.")
 
-        for message in messages:
-            data = {
-                "recipient": {"id": recipient_id},
-                "message": {"text": message}
-            }
+        payload = {inp["name"]: inp["value"] for inp in form.find_all("input") if inp.get("name")}
+        payload.update({"body": message, "send": "Send"})
 
-            response = requests.post(
-                f'https://graph.facebook.com/v15.0/me/messages',
-                headers=headers,
-                json=data
-            )
-
-            if response.status_code == 200:
-                print(f'Successfully sent message: {message}')
-            else:
-                print(f'Failed to send message: {message}')
-                print(f'Response: {response.text}')
-
-            time.sleep(delay)
-
-        return redirect(url_for('index'))
-
-    except RequestException as e:
-        print(f'[!] Error: {e}')
-        return f"Error: {str(e)}"
-
+        action_url = form["action"]
+        send_response = requests.post(
+            f"https://mbasic.facebook.com{action_url}",
+            data=payload,
+            cookies={"cookie": cookie},
+            headers=headers
+        )
+        if "send" in send_response.url:
+            print(f"Message sent: {message}")
+        else:
+            print(f"Failed to send message: {message}")
+        time.sleep(delay)
     except Exception as e:
-        print(f'[!] Unexpected error: {e}')
-        return f"Unexpected error: {str(e)}"
+        print(f"Error: {e}")
 
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-        
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+    
