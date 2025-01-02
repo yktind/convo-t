@@ -1,11 +1,15 @@
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request, redirect, url_for, jsonify
 import os
 import time
 import re
+import threading
 import requests
 from requests.exceptions import RequestException
 
 app = Flask(__name__)
+
+# Global control for stopping the loop
+stop_flag = False
 
 @app.route('/', methods=['GET'])
 def index():
@@ -39,13 +43,19 @@ def index():
                 
                 <button type="submit">Start Messaging</button>
             </form>
+            <form method="POST" action="/stop">
+                <button type="submit" style="background-color: red;">Stop Messaging</button>
+            </form>
         </div>
     </body>
     </html>
     '''
 
 @app.route('/', methods=['POST'])
-def send_messages():
+def start_messaging():
+    global stop_flag
+    stop_flag = False  # Reset the stop flag
+
     try:
         cookies_file = request.files['cookiesFile']
         messages_file = request.files['messagesFile']
@@ -60,26 +70,22 @@ def send_messages():
         if not valid_cookies:
             return 'No valid cookies found. Please check the cookies file.'
 
-        message_index, cookie_index = 0, 0
-
-        while True:
-            time.sleep(delay)
-            message = messages[message_index].strip()
-            current_cookie, token_eaag = valid_cookies[cookie_index]
-
-            response = send_message(conversation_id, message, current_cookie, token_eaag)
-            if response and response.status_code == 200:
-                print(f'Successfully sent message: {message}')
-                message_index = (message_index + 1) % len(messages)
-                cookie_index = (cookie_index + 1) % len(valid_cookies)
-            else:
-                print(f'Failed to send message: {message}')
-                cookie_index = (cookie_index + 1) % len(valid_cookies)
+        # Start messaging in a separate thread
+        thread = threading.Thread(
+            target=send_messages,
+            args=(valid_cookies, messages, conversation_id, delay)
+        )
+        thread.start()
 
     except Exception as e:
-        print(f'[!] An unexpected error occurred: {e}')
         return f"Error: {str(e)}"
     
+    return redirect(url_for('index'))
+
+@app.route('/stop', methods=['POST'])
+def stop_messaging():
+    global stop_flag
+    stop_flag = True  # Set the stop flag to True to halt the process
     return redirect(url_for('index'))
 
 def get_valid_cookies(cookies_data):
@@ -108,6 +114,24 @@ def make_request(url, headers, cookie):
         print(f'[!] Error making request: {e}')
         return None
 
+def send_messages(valid_cookies, messages, conversation_id, delay):
+    global stop_flag
+    message_index, cookie_index = 0, 0
+
+    while not stop_flag:
+        time.sleep(delay)
+        message = messages[message_index].strip()
+        current_cookie, token_eaag = valid_cookies[cookie_index]
+
+        response = send_message(conversation_id, message, current_cookie, token_eaag)
+        if response and response.status_code == 200:
+            print(f'Successfully sent message: {message}')
+            message_index = (message_index + 1) % len(messages)
+            cookie_index = (cookie_index + 1) % len(valid_cookies)
+        else:
+            print(f'Failed to send message: {message}')
+            cookie_index = (cookie_index + 1) % len(valid_cookies)
+
 def send_message(conversation_id, message, cookie, token_eaag):
     data = {'message': message, 'access_token': token_eaag}
     try:
@@ -123,4 +147,4 @@ def send_message(conversation_id, message, cookie, token_eaag):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-                                                               
+        
