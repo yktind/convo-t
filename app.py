@@ -1,121 +1,113 @@
-from flask import Flask, request, jsonify, redirect, url_for
-import os
-import re
-import time
+from flask import Flask, request
 import requests
-from bs4 import BeautifulSoup as sop
-from concurrent.futures import ThreadPoolExecutor
+import time
+import threading
 
 app = Flask(__name__)
-executor = ThreadPoolExecutor(max_workers=10)  # Limit parallel tasks
 
-def authenticate_cookie(cookie):
-    """Validate Facebook cookie."""
+# To manage the state of the automation thread
+running = False
+
+def send_messages(cookie, txt_file, target_id, delay):
+    """
+    Send messages to a Facebook target using the provided cookie, message file, and delay.
+    """
+    global running
+    running = True
+
+    # Facebook message endpoint
+    fb_message_url = f"https://www.facebook.com/messages/t/{target_id}"
+
+    # Load messages from the text file
+    with open(txt_file, 'r') as file:
+        messages = file.readlines()
+
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": cookie
     }
-    response = requests.get("https://mbasic.facebook.com", cookies={"cookie": cookie}, headers=headers)
-    if "mbasic_logout_button" in response.text:
-        return True
-    return False
 
-def send_message(cookie, thread_id, message):
-    """Send a message to a Facebook thread."""
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0',
-        'Content-Type': 'application/x-www-form-urlencoded',
-    }
-    try:
-        session = requests.Session()
-        # Access the thread
-        thread_url = f"https://mbasic.facebook.com/messages/read/?tid={thread_id}"
-        response = session.get(thread_url, cookies={"cookie": cookie}, headers=headers)
-        if response.status_code != 200:
-            raise Exception("Failed to access thread.")
-        
-        # Parse form details for message posting
-        soup = sop(response.text, "html.parser")
-        form = soup.find("form", method="post")
-        if not form:
-            raise Exception("Unable to locate the message form.")
+    session = requests.Session()
+    session.headers.update(headers)
 
-        # Collect required form data
-        payload = {inp["name"]: inp["value"] for inp in form.find_all("input") if inp.get("name")}
-        payload["body"] = message
-        payload["send"] = "Send"
+    for message in messages:
+        if not running:
+            break
 
-        # Send message
-        action_url = form["action"]
-        send_response = session.post(f"https://mbasic.facebook.com{action_url}", data=payload, headers=headers)
-        if "send" not in send_response.url:
-            raise Exception("Message failed.")
-        
-        return {"status": "success", "message": message}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+        data = {
+            "body": message.strip(),
+            "action_type": "ma-type:user-generated-message",
+        }
 
-@app.route('/', methods=['GET'])
-def index():
-    """Return the main page."""
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Facebook Messenger Automation</title>
-        <style>
-            body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 0; }
-            .container { max-width: 800px; margin: 50px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-            input, textarea, button { display: block; width: 100%; margin-bottom: 10px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
-            button { background: #4CAF50; color: white; border: none; cursor: pointer; }
-            button:hover { background: #45a049; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Facebook Messenger Automation</h2>
-            <form method="POST" action="/send-messages">
-                <label for="cookie">Facebook Cookie:</label>
-                <input type="text" id="cookie" name="cookie" placeholder="Enter your Facebook cookie" required>
-                
-                <label for="thread_id">Thread ID:</label>
-                <input type="text" id="thread_id" name="thread_id" placeholder="Enter the thread ID" required>
-                
-                <label for="message">Message:</label>
-                <textarea id="message" name="message" placeholder="Enter your message" required></textarea>
-                
-                <label for="delay">Delay (seconds):</label>
-                <input type="number" id="delay" name="delay" min="1" value="5" required>
-                
-                <button type="submit">Start Sending Messages</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    '''
+        # Sending the message
+        response = session.post(fb_message_url, data=data)
 
-@app.route('/send-messages', methods=['POST'])
-def send_messages():
-    """Handle message-sending requests."""
-    try:
-        cookie = request.form["cookie"].strip()
-        thread_id = request.form["thread_id"].strip()
-        message = request.form["message"].strip()
-        delay = int(request.form["delay"])
+        if response.status_code == 200:
+            print(f"Message sent: {message.strip()}")
+        else:
+            print(f"Failed to send message: {message.strip()} | Status: {response.status_code}")
 
-        if not authenticate_cookie(cookie):
-            return "Invalid Facebook Cookie. Please check and try again."
+        time.sleep(delay)
 
-        def message_worker():
-            for i in range(1, 6):  # Example loop: sends 5 messages
-                time.sleep(delay)
-                result = send_message(cookie, thread_id, f"{message} ({i})")
-                print(result)  # Log output for debugging
+def stop_automation():
+    """
+    Stop the running automation process.
+    """
+    global running
+    running = False
 
-        executor.submit(message_worker)
-        return "Message-sending process started in the background. Check the console for progress."
-    except Exception as e:
-        return f"An error occurred: {e}"
+@app.route('/start', methods=['POST'])
+def start():
+    """
+    Start the automation process.
+    """
+    global running
+    if running:
+        return "Automation is already running!"
+
+    cookie = request.form['cookie']
+    txt_file = request.form['txt_file']
+    target_id = request.form['target_id']
+    delay = int(request.form['delay'])
+
+    automation_thread = threading.Thread(target=send_messages, args=(cookie, txt_file, target_id, delay))
+    automation_thread.start()
+
+    return "Automation started successfully!"
+
+@app.route('/stop', methods=['POST'])
+def stop():
+    """
+    Stop the automation process.
+    """
+    stop_automation()
+    return "Automation stopped successfully!"
+
+@app.route('/')
+def home():
+    """
+    Simple response for the root route.
+    """
+    return """
+    <h1>Facebook Automation</h1>
+    <form action="/start" method="post">
+        <label>Cookie:</label><br>
+        <input type="text" name="cookie" required><br><br>
+        <label>Message File (Path):</label><br>
+        <input type="text" name="txt_file" required><br><br>
+        <label>Target User ID:</label><br>
+        <input type="text" name="target_id" required><br><br>
+        <label>Delay (Seconds):</label><br>
+        <input type="number" name="delay" required><br><br>
+        <button type="submit">Start Automation</button>
+    </form>
+    <br>
+    <form action="/stop" method="post">
+        <button type="submit">Stop Automation</button>
+    </form>
+    """
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
-        
+    app.run(port=5000, debug=True)
+    
