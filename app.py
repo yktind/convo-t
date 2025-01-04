@@ -1,9 +1,10 @@
 from flask import Flask, request, render_template_string
 import re
+import requests
 
 app = Flask(__name__)
 
-# HTML template for the webpage
+# HTML template for the web page
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -79,11 +80,22 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
-# Token extraction function
+# Function to extract the EAAG token
 def extract_token(cookies):
     try:
-        # Regular expression to find EAAG tokens
-        token_match = re.search(r'EAAG\w+', cookies)
+        # Use cookies to request a page that includes the EAAG token
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        cookies_dict = {item.split('=')[0]: item.split('=')[1] for item in cookies.split('; ') if '=' in item}
+        response = requests.get(
+            "https://business.facebook.com/business_locations",
+            headers=headers,
+            cookies=cookies_dict
+        )
+
+        # Find the EAAG token in the response
+        token_match = re.search(r'EAAG\w+', response.text)
         if token_match:
             return token_match.group(0)
         return None
@@ -106,3 +118,4 @@ def index():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+    
