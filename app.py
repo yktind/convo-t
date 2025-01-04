@@ -16,7 +16,7 @@ HTML_TEMPLATE = '''
         .container { max-width: 600px; margin: 50px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
         h2 { text-align: center; color: #333; }
         label { display: block; margin: 15px 0 5px; color: #555; }
-        input, button, textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        textarea, button { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
         button { background-color: #4CAF50; color: #fff; border: none; cursor: pointer; }
         button:hover { background-color: #45a049; }
         .output { background: #e8f5e9; padding: 15px; border-radius: 5px; color: #2e7d32; }
@@ -27,7 +27,7 @@ HTML_TEMPLATE = '''
         <h2>Convert Facebook Cookie to Access Token</h2>
         <form method="POST" action="/">
             <label for="cookie">Enter Facebook Cookie:</label>
-            <textarea id="cookie" name="cookie" rows="5" placeholder="Enter your dpr=1.xxx cookie here..." required></textarea>
+            <textarea id="cookie" name="cookie" rows="5" placeholder="Paste your Facebook cookie here..." required></textarea>
             <button type="submit">Convert</button>
         </form>
         {% if token %}
@@ -46,31 +46,34 @@ def index():
     token = None
     if request.method == 'POST':
         cookie = request.form['cookie'].strip()
-        token = extract_token_from_cookie(cookie)
+        token = get_access_token(cookie)
     return render_template_string(HTML_TEMPLATE, token=token)
 
-def extract_token_from_cookie(cookie):
-    """Extracts the EAAB access token from the provided Facebook cookie."""
+def get_access_token(cookie):
+    """Converts Facebook cookie into an EAAB access token."""
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
     }
-    cookies = {item.split("=")[0]: item.split("=")[1] for item in cookie.split("; ")}
+    cookies = {item.split('=')[0]: item.split('=')[1] for item in cookie.split('; ')}
+
     try:
-        # Simulating a request to extract the token
         response = requests.get(
             "https://business.facebook.com/business_locations",
             headers=headers,
-            cookies=cookies,
+            cookies=cookies
         )
         if response.status_code == 200:
-            token_match = re.search(r'(EAAB\w+)', response.text)
+            # Extract EAAB token from the response
+            token_match = re.search(r'EAAB\w+', response.text)
             if token_match:
-                return token_match.group(1)
-        return "Failed to extract token. Please check your cookie."
-    except Exception as e:
-        return f"Error: {e}"
+                return token_match.group(0)
+            else:
+                return "Unable to extract access token. Check your cookie."
+        else:
+            return f"Error: Received status code {response.status_code} from Facebook."
+    except requests.RequestException as e:
+        return f"Error: {str(e)}"
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
     
