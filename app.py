@@ -1,176 +1,173 @@
-from flask import Flask, request, render_template, redirect, url_for
-import os
-import time
-import requests
+from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# Static variables for headers
-headers = {
-    'Connection': 'keep-alive',
-    'Cache-Control': 'max-age=0',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.76 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Encoding': 'gzip, deflate',
-    'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
-}
+# HTML Template as a Python string
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> COOKIES TO JSON CONVERTER MADE BY YK TRICKS INDIA</title>
+    <style>
+        /* Full-screen laser light background */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
 
-@app.route('/')
-def index():
-    return '''
-    <div id='content'>
-<!-- info --><div style="font-size: 20px">
-<script type="text/javascript">
-farbbibliothek = new Array();
-farbbibliothek[0] = new Array("#FF0000","#FF1100","#FF2200","#FF3300","#FF4400","#FF5500","#FF6600","#FF7700","#FF8800","#FF9900","#FFaa00","#FFbb00","#FFcc00","#FFdd00","#FFee00","#FFff00","#FFee00","#FFdd00","#FFcc00","#FFbb00","#FFaa00","#FF9900","#FF8800","#FF7700","#FF6600","#FF5500","#FF4400","#FF3300","#FF2200","#FF1100");
-farbbibliothek[1] = new Array("#00FF00","#000000","#00FF00","#00FF00");
-farbbibliothek[2] = new Array("#00FF00","#FF0000","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00");
-farbbibliothek[3] = new Array("#FF0000","#FF4000","#FF8000","#FFC000","#FFFF00","#C0FF00","#80FF00","#40FF00","#00FF00","#00FF40","#00FF80","#00FFC0","#00FFFF","#00C0FF","#0080FF","#0040FF","#0000FF","#4000FF","#8000FF","#C000FF","#FF00FF","#FF00C0","#FF0080","#FF0040");
-farbbibliothek[4] = new Array("#FF0000","#EE0000","#DD0000","#CC0000","#BB0000","#AA0000","#990000","#880000","#770000","#660000","#550000","#440000","#330000","#220000","#110000","#000000","#110000","#220000","#330000","#440000","#550000","#660000","#770000","#880000","#990000","#AA0000","#BB0000","#CC0000","#DD0000","#EE0000");
-farbbibliothek[5] = new Array("#000000","#000000","#000000","#FFFFFF","#FFFFFF","#FFFFFF");
-farbbibliothek[6] = new Array("#0000FF","#FFFF00");
-farben = farbbibliothek[4];
-function farbschrift(){for(var b=0;b<Buchstabe.length;b++){document.all["a"+b].style.color=farben[b]}farbverlauf()}function string2array(b){Buchstabe=new Array();while(farben.length<b.length){farben=farben.concat(farben)}k=0;while(k<=b.length){Buchstabe[k]=b.charAt(k);k++}}function divserzeugen(){for(var b=0;b<Buchstabe.length;b++){document.write("<span id='a"+b+"' class='a"+b+"'>"+Buchstabe[b]+"</span>")}farbschrift()}var a=1;function farbverlauf(){for(var b=0;b<farben.length;b++){farben[b-1]=farben[b]}farben[farben.length-1]=farben[-1];setTimeout("farbschrift()",30)}var farbsatz=1;function farbtauscher(){farben=farbbibliothek[farbsatz];while(farben.length<text.length){farben=farben.concat(farben)}farbsatz=Math.floor(Math.random()*(farbbibliothek.length-0.0001))}setInterval("farbtauscher()",5000);
- 
-text= "ðŸ’™ðŸ’šâ¤ï¸THIS WEB PAGE IS MADE BY Mr.YK TRICKS INDIA ðŸ’«ðŸ’¯ðŸŸ¥ðŸŸ¨ðŸŸ§OWNER :- Mr.YK TRICKS INDIA âœ¨ðŸðŸŒ¹"; //h
-string2array(text);
-divserzeugen();
-//document.write(text);
-</script></div>
-<p id='name'>           
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>YK TRICKS INDIA â¤ï¸</title>
-          <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
-          <style>
-            body {
-              background-color: white;
-            }
-            .container {
-              max-width: 370px;
-              background-color: yellow;
-              border-radius: 10px;
-              padding: 20px;
-              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-              margin: 0 auto;
-              margin-top: 20px;
-            }
-            .header {
-              text-align: center;
-              padding-bottom: 10px;
-            }
-            .btn-submit {
-              width: 100%;
-              margin-top: 10px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 10px;
-              color: blue;
-            }
-          </style>
-        </head>
-        <body>
-          <header class="header mt-4">
-            <h1 class="mb-3">ðŸš€ YK TRICKS INDIAâœ¨</h1>
-            <h3>OWNER BY MR. YK TRICKS INDIA â¤ï¸</h3>
-          </header>
+        /* Animated RGB gradient background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, 
+                #ff0000, #ff7300, #ffeb00, #47ff00, 
+                #00ffe1, #007bff, #d200ff, #ff00d4);
+            background-size: 400% 400%;
+            animation: gradientShift 10s infinite;
+            z-index: -1;
+        }
 
-          <div class="container">
-            <form action="/" method="post" enctype="multipart/form-data">
-              <div class="mb-3">
-                <label for="tokenType">Select Token Type:</label>
-                <select class="form-control" id="tokenType" name="tokenType" required>
-                  <option value="single">Single Token</option>
-                  <option value="multi">Multi Token</option>
-                </select>
-              </div>
-              <div class="mb-3">
-                <label for="accessToken">Enter Your Token:</label>
-                <input type="text" class="form-control" id="accessToken" name="accessToken">
-              </div>
-              <div class="mb-3">
-                <label for="threadId">Enter Convo/Inbox ID:</label>
-                <input type="text" class="form-control" id="threadId" name="threadId" required>
-              </div>
-              <div class="mb-3">
-                <label for="kidx">Enter Hater Name:</label>
-                <input type="text" class="form-control" id="kidx" name="kidx" required>
-              </div>
-              <div class="mb-3">
-                <label for="txtFile">Select Your Notepad File:</label>
-                <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
-              </div>
-              <div class="mb-3" id="multiTokenFile" style="display: none;">
-                <label for="tokenFile">Select Token File (for multi-token):</label>
-                <input type="file" class="form-control" id="tokenFile" name="tokenFile" accept=".txt">
-              </div>
-              <div class="mb-3">
-                <label for="time">Speed in Seconds:</label>
-                <input type="number" class="form-control" id="time" name="time" required>
-              </div>
-              <button type="submit" class="btn btn-primary btn-submit">Submit Your Details</button>
-            </form>
-          </div>
-          <footer class="footer">
-            <p>&copy; Developed by YK Tricks India 2024. All Rights Reserved.</p>
-            <p>Convo/Inbox Web Tool</p>
-            <p>Keep Enjoying!</p>
-          </footer>
-        </body>
-        </html>
-    '''
+        /* Keyframe for gradient animation */
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
 
-@app.route('/', methods=['POST'])
-def process_form():
-    token_type = request.form.get('tokenType')
-    access_token = request.form.get('accessToken')
-    thread_id = request.form.get('threadId')
-    hater_name = request.form.get('kidx')
-    time_interval = int(request.form.get('time'))
+        /* Main content container */
+        .container {
+            z-index: 1;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 1.2em;
+            line-height: 1.5;
+        }
+
+        /* Buttons with glowing effects */
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 15px 5px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(to right, #ff00d4, #ff7300);
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(255, 115, 0, 0.6);
+        }
+
+        .button:hover {
+            background: linear-gradient(to right, #47ff00, #00ffe1);
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(0, 255, 225, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>COOKIES TO JSON CONVERTER MADE BY YK TRICKS INDIA</h1>
+        <form id="cookieForm">
+            <label for="cookies">Paste Your Simple Cookie Here:</label>
+            <textarea id="cookies" name="cookies" placeholder="datr=V7QPZzH8-GBiYnbp3ZkAksOB; sb=V7QPZwHEDTWR226ath-V0gBi;"></textarea>
+            <button type="submit">Convert to JSON</button>
+        </form>
+        <h2>JSON Result:</h2>
+        <pre id="jsonOutput"></pre>
+        <button id="copyButton" class="copy-button" style="display:none;">Copy to Clipboard</button>
     
-    txt_file = request.files['txtFile']
-    messages = txt_file.read().decode().splitlines()
+    <a href="http://65.108.77.37:21686/" id="themeButton1" class="theme-button">Instagram Token Extractor</a>
+        <a href="https://youtu.be/E6dokyGR_hQ" id="themeButton2" class="theme-button">Token Video</a>
+        <a href="https://www.facebook.com/dialog/oauth?scope=user_about_me,user_actions.books,user_actions.fitness,user_actions.music,user_actions.news,user_actions.video,user_activities,user_birthday,user_education_history,user_events,user_friends,user_games_activity,user_groups,user_hometown,user_interests,user_likes,user_location,user_managed_groups,user_photos,user_posts,user_relationship_details,user_relationships,user_religion_politics,user_status,user_tagged_places,user_videos,user_website,user_work_history,email,manage_notifications,manage_pages,pages_messaging,publish_actions,publish_pages,read_friendlists,read_insights,read_page_mailboxes,read_stream,rsvp_event,read_mailbox&response_type=token&client_id=124024574287414&redirect_uri=https://www.instagram.com/" id="themeButton1" class="theme-button">Permissions</a>
     
-    tokens = []
-    if token_type == 'multi':
-        token_file = request.files.get('tokenFile')
-        if token_file:
-            tokens = token_file.read().decode().splitlines()
+    </div>
 
-    folder_name = f"Convo_{thread_id}"
-    os.makedirs(folder_name, exist_ok=True)
+    <script>
+        document.getElementById('cookieForm').onsubmit = async function(event) {
+            event.preventDefault();
+            const cookies = document.getElementById('cookies').value;
+            const response = await fetch('/convert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ cookies })
+            });
+            const jsonOutput = await response.json();
+            document.getElementById('jsonOutput').textContent = JSON.stringify(jsonOutput, null, 4);
+            document.getElementById('copyButton').style.display = 'block'; // Show button
+        }
 
-    with open(os.path.join(folder_name, "details.txt"), "w") as f:
-        f.write(f"Thread ID: {thread_id}\n")
-        f.write(f"Hater Name: {hater_name}\n")
-        f.write(f"Speed (s): {time_interval}\n")
-        f.write("\n".join(messages))
+        document.getElementById('copyButton').onclick = function() {
+            const jsonText = document.getElementById('jsonOutput').textContent;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                alert('JSON copied successfully!');
+            }).catch(err => {
+                alert('Error copying JSON: ', err);
+            });
+        }
+    </script>
+</body>
+</html>
+"""
 
-    if tokens:
-        with open(os.path.join(folder_name, "tokens.txt"), "w") as f:
-            f.write("\n".join(tokens))
+# Utility function to parse cookies
+def parse_cookies(cookie_string):
+    """
+    Parse cookies into a dictionary format.
+    """
+    cookies = {}
+    for pair in cookie_string.split(";"):
+        if "=" in pair:
+            key, value = pair.split("=", 1)
+            cookies[key.strip()] = value.strip()
+    return cookies
 
-    post_url = f'https://graph.facebook.com/v15.0/t_{thread_id}/'
+# Flask Routes
+@app.route("/", methods=["GET"])
+def home():
+    return render_template_string(HTML_TEMPLATE)
 
-    for message_index, message in enumerate(messages):
-        token = access_token if token_type == 'single' else tokens[message_index % len(tokens)]
-        data = {'access_token': token, 'message': f"{hater_name} {message}"}
-        response = requests.post(post_url, json=data, headers=headers)
+@app.route("/convert", methods=["POST"])
+def convert():
+    try:
+        cookies = request.form.get("cookies", "")
+        parsed_cookies = parse_cookies(cookies)
+        return jsonify(parsed_cookies)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
-        if response.ok:
-            print(f"[SUCCESS] Sent: {message}")
-        else:
-            print(f"[FAILURE] Failed to send: {message}")
-        time.sleep(time_interval)
-
-    return redirect(url_for('index'))
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-
-    
+# Run the Flask app
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
