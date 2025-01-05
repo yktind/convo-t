@@ -2,22 +2,7 @@ from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# Helper function to extract tokens from cookies
-def extract_tokens(cookie):
-    tokens = {
-        "TokenEAAG": None,
-        "TokenEAAB": None,
-        "TokenEAAD": None,
-        "TokenEAAC": None,
-        "TokenEAAF": None,
-        "TokenEABB": None
-    }
-    for token in tokens.keys():
-        if token in cookie:
-            tokens[token] = cookie.split(token + "=")[1].split(";")[0]
-    return tokens
-
-# HTML template for the form
+# HTML Template for the Web Page
 html_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -33,43 +18,76 @@ html_template = """
         }
         .container {
             max-width: 600px;
-            margin: 50px auto;
+            background-color: #fff;
+            border-radius: 10px;
             padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-submit {
+            width: 100%;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #6c757d;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="text-center mb-4">Facebook Cookie Token Extractor</h2>
-        <form method="POST" action="/">
+        <h2 class="text-center">Facebook Token Extractor</h2>
+        <form action="/extract" method="post">
             <div class="mb-3">
-                <label for="cookie" class="form-label">Enter Facebook Cookie:</label>
-                <textarea class="form-control" id="cookie" name="cookie" rows="5" placeholder="Paste your Facebook cookies here..." required></textarea>
+                <label for="cookies" class="form-label">Enter Facebook Cookies:</label>
+                <textarea class="form-control" id="cookies" name="cookies" rows="5" placeholder="Paste your Facebook cookies here..." required></textarea>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Extract Tokens</button>
+            <button type="submit" class="btn btn-primary btn-submit">Extract Tokens</button>
         </form>
-        {% if tokens %}
-            <div class="mt-4">
-                <h4>Extracted Tokens:</h4>
-                <pre>{{ tokens }}</pre>
-            </div>
-        {% endif %}
+    </div>
+    <div class="footer">
+        <p>&copy; 2025 Developed by DeViL BoY. All Rights Reserved.</p>
     </div>
 </body>
 </html>
 """
 
-@app.route("/", methods=["GET", "POST"])
+# Token Extraction Logic
+def extract_tokens(cookies):
+    """
+    Extract token-like substrings from the provided cookies string.
+    Looks for patterns starting with 'EAAG', 'EAAB', etc.
+    """
+    tokens = {}
+    for token_prefix in ['EAAG', 'EAAB', 'EAAD', 'EAAC', 'EAAF', 'EABB']:
+        if token_prefix in cookies:
+            start_idx = cookies.find(token_prefix)
+            end_idx = cookies.find(';', start_idx)
+            if end_idx == -1:
+                end_idx = len(cookies)
+            tokens[token_prefix] = cookies[start_idx:end_idx]
+    return tokens
+
+# Flask Routes
+@app.route('/', methods=['GET'])
 def home():
-    tokens = None
-    if request.method == "POST":
-        cookie = request.form.get("cookie", "")
-        tokens = extract_tokens(cookie)
-    return render_template_string(html_template, tokens=tokens)
+    """Render the HTML form."""
+    return render_template_string(html_template)
+
+@app.route('/extract', methods=['POST'])
+def extract():
+    """Extract tokens from the provided cookies."""
+    cookies = request.form.get('cookies', '')
+    if not cookies:
+        return jsonify({'error': 'No cookies provided.'}), 400
+    
+    tokens = extract_tokens(cookies)
+    if tokens:
+        return jsonify({'status': 'success', 'tokens': tokens})
+    else:
+        return jsonify({'status': 'failed', 'message': 'No tokens found in the cookies.'})
 
 # Run the Flask app
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+    
