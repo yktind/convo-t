@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
@@ -9,76 +9,83 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facebook Token Extractor</title>
+    <title>Cookie Extractor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
             background-color: #f8f9fa;
             font-family: Arial, sans-serif;
-            padding: 20px;
         }
         .container {
-            max-width: 500px;
-            background-color: #fff;
-            border-radius: 10px;
+            margin-top: 50px;
+            max-width: 600px;
+            background: #fff;
             padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
         }
-        .btn-submit {
-            width: 100%;
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            padding: 10px;
-            font-size: 1rem;
-            border-radius: 5px;
-            transition: background-color 0.3s;
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
         }
-        .btn-submit:hover {
-            background-color: #0056b3;
+        .footer {
+            text-align: center;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="text-center">Facebook Token Extractor</h2>
-        <form action="/get-token" method="post">
+        <div class="header">
+            <h1>Cookie Extractor Tool</h1>
+            <p>Extract and display Facebook cookies</p>
+        </div>
+        <form action="/extract" method="post">
             <div class="mb-3">
-                <label for="cookies" class="form-label">Enter Facebook Cookies:</label>
-                <textarea class="form-control" id="cookies" name="cookies" rows="5" placeholder="Paste your Facebook cookies here..." required></textarea>
+                <label for="cookieInput" class="form-label">Paste Your Cookies Here:</label>
+                <textarea class="form-control" id="cookieInput" name="cookies" rows="5" required></textarea>
             </div>
-            <button type="submit" class="btn btn-primary btn-submit">Extract Token</button>
+            <button type="submit" class="btn btn-primary w-100">Extract Cookies</button>
         </form>
+        {% if cookies %}
+        <div class="mt-4">
+            <h4>Extracted Cookies:</h4>
+            <ul class="list-group">
+                {% for key, value in cookies.items() %}
+                <li class="list-group-item"><strong>{{ key }}:</strong> {{ value }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
     </div>
+    <footer class="footer">
+        <p>&copy; 2024 Cookie Extractor. All rights reserved.</p>
+    </footer>
 </body>
 </html>
 """
 
-# Helper function to simulate token extraction
-def extract_token_from_cookies(cookies):
-    # Placeholder logic for token extraction
-    if "EAAB" in cookies:
-        return "EAABSampleToken123456789"  # Replace with actual extraction logic
-    return None
+# Route for the main page
+@app.route("/", methods=["GET", "POST"])
+def index():
+    extracted_cookies = {}
+    if request.method == "POST":
+        cookie_string = request.form.get("cookies", "")
+        extracted_cookies = parse_cookies(cookie_string)
+    return render_template_string(HTML_TEMPLATE, cookies=extracted_cookies)
 
-@app.route("/")
-def home():
-    return render_template_string(HTML_TEMPLATE)
+# Function to parse cookie string into a dictionary
+def parse_cookies(cookie_string):
+    cookies = {}
+    try:
+        for item in cookie_string.split(";"):
+            key, value = item.strip().split("=", 1)
+            cookies[key.strip()] = value.strip()
+    except Exception as e:
+        print(f"Error parsing cookies: {e}")
+    return cookies
 
-@app.route("/get-token", methods=["POST"])
-def get_token():
-    cookies = request.form.get("cookies")
-    if not cookies:
-        return jsonify({"error": "Cookies not provided"}), 400
-
-    # Extract token from cookies
-    token = extract_token_from_cookies(cookies)
-    if token:
-        return jsonify({"success": True, "token": token}), 200
-    else:
-        return jsonify({"error": "Unable to extract token"}), 400
-
+# Run the Flask app
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
     
