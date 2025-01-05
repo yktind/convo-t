@@ -1,173 +1,132 @@
-from flask import Flask, request, jsonify, render_template_string
+import requests
+from flask import Flask, request, render_template_string
+import re
 
 app = Flask(__name__)
 
-# HTML Template as a Python string
-HTML_TEMPLATE = """
+# HTML Template for the Web Page
+HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> COOKIES TO JSON CONVERTER MADE BY YK TRICKS INDIA</title>
+    <title>Instagram Fake Account Checker</title>
     <style>
-        /* Full-screen laser light background */
         body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            overflow: hidden;
             font-family: Arial, sans-serif;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
         }
-
-        /* Animated RGB gradient background */
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(45deg, 
-                #ff0000, #ff7300, #ffeb00, #47ff00, 
-                #00ffe1, #007bff, #d200ff, #ff00d4);
-            background-size: 400% 400%;
-            animation: gradientShift 10s infinite;
-            z-index: -1;
-        }
-
-        /* Keyframe for gradient animation */
-        @keyframes gradientShift {
-            0% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
-            100% {
-                background-position: 0% 50%;
-            }
-        }
-
-        /* Main content container */
         .container {
-            z-index: 1;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        }
-
-        h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-
-        p {
-            font-size: 1.2em;
-            line-height: 1.5;
-        }
-
-        /* Buttons with glowing effects */
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            margin: 15px 5px;
-            font-size: 1.2em;
-            border: none;
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
             border-radius: 8px;
-            background: linear-gradient(to right, #ff00d4, #ff7300);
-            color: white;
-            text-decoration: none;
-            transition: all 0.3s;
-            box-shadow: 0 0 20px rgba(255, 115, 0, 0.6);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-
-        .button:hover {
-            background: linear-gradient(to right, #47ff00, #00ffe1);
-            transform: scale(1.1);
-            box-shadow: 0 0 30px rgba(0, 255, 225, 0.8);
+        textarea, button {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-left: 5px solid #4CAF50;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-left: 5px solid #f5c6cb;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>COOKIES TO JSON CONVERTER MADE BY YK TRICKS INDIA</h1>
-        <form id="cookieForm">
-            <label for="cookies">Paste Your Simple Cookie Here:</label>
-            <textarea id="cookies" name="cookies" placeholder="datr=V7QPZzH8-GBiYnbp3ZkAksOB; sb=V7QPZwHEDTWR226ath-V0gBi;"></textarea>
-            <button type="submit">Convert to JSON</button>
+        <h2>Instagram Fake Account Checker</h2>
+        <form method="POST" action="/">
+            <label for="cookies">Enter Instagram Cookies:</label>
+            <textarea name="cookies" rows="8" placeholder="Paste your Instagram cookies here..." required></textarea>
+            <button type="submit">Check Account</button>
         </form>
-        <h2>JSON Result:</h2>
-        <pre id="jsonOutput"></pre>
-        <button id="copyButton" class="copy-button" style="display:none;">Copy to Clipboard</button>
-    
-    <a href="http://65.108.77.37:21686/" id="themeButton1" class="theme-button">Instagram Token Extractor</a>
-        <a href="https://youtu.be/E6dokyGR_hQ" id="themeButton2" class="theme-button">Token Video</a>
-        <a href="https://www.facebook.com/dialog/oauth?scope=user_about_me,user_actions.books,user_actions.fitness,user_actions.music,user_actions.news,user_actions.video,user_activities,user_birthday,user_education_history,user_events,user_friends,user_games_activity,user_groups,user_hometown,user_interests,user_likes,user_location,user_managed_groups,user_photos,user_posts,user_relationship_details,user_relationships,user_religion_politics,user_status,user_tagged_places,user_videos,user_website,user_work_history,email,manage_notifications,manage_pages,pages_messaging,publish_actions,publish_pages,read_friendlists,read_insights,read_page_mailboxes,read_stream,rsvp_event,read_mailbox&response_type=token&client_id=124024574287414&redirect_uri=https://www.instagram.com/" id="themeButton1" class="theme-button">Permissions</a>
-    
+        {% if result %}
+        <div class="result">
+            <strong>Account Status:</strong>
+            <p>{{ result }}</p>
+        </div>
+        {% elif error %}
+        <div class="result error">
+            <strong>Error:</strong>
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
     </div>
-
-    <script>
-        document.getElementById('cookieForm').onsubmit = async function(event) {
-            event.preventDefault();
-            const cookies = document.getElementById('cookies').value;
-            const response = await fetch('/convert', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({ cookies })
-            });
-            const jsonOutput = await response.json();
-            document.getElementById('jsonOutput').textContent = JSON.stringify(jsonOutput, null, 4);
-            document.getElementById('copyButton').style.display = 'block'; // Show button
-        }
-
-        document.getElementById('copyButton').onclick = function() {
-            const jsonText = document.getElementById('jsonOutput').textContent;
-            navigator.clipboard.writeText(jsonText).then(() => {
-                alert('JSON copied successfully!');
-            }).catch(err => {
-                alert('Error copying JSON: ', err);
-            });
-        }
-    </script>
 </body>
 </html>
-"""
+'''
 
-# Utility function to parse cookies
-def parse_cookies(cookie_string):
-    """
-    Parse cookies into a dictionary format.
-    """
-    cookies = {}
-    for pair in cookie_string.split(";"):
-        if "=" in pair:
-            key, value = pair.split("=", 1)
-            cookies[key.strip()] = value.strip()
-    return cookies
-
-# Flask Routes
-@app.route("/", methods=["GET"])
-def home():
-    return render_template_string(HTML_TEMPLATE)
-
-@app.route("/convert", methods=["POST"])
-def convert():
+# Function to check if an account is fake based on a simple heuristic (low followers)
+def check_fake_account(cookies):
     try:
-        cookies = request.form.get("cookies", "")
-        parsed_cookies = parse_cookies(cookies)
-        return jsonify(parsed_cookies)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        # Send a request to Instagram's profile page to retrieve account data
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0"
+        }
 
-# Run the Flask app
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+        # Dummy Instagram profile URL for user to test (e.g., change this to a real profile URL)
+        profile_url = 'https://www.instagram.com/{}/'.format(cookies)  # Normally, this would be the Instagram username
+        
+        response = requests.get(profile_url, cookies={'cookie': cookies}, headers=headers)
+        
+        if response.status_code != 200:
+            raise Exception("Failed to load Instagram profile.")
+        
+        # You could scrape profile details here. For simplicity, we will check if "followers" exist in the page
+        if 'followers' not in response.text:
+            return "Unable to retrieve account data."
+
+        # Check followers count (simplified logic)
+        followers_count_match = re.search(r'\"followers_count\":(\d+)', response.text)
+        if followers_count_match:
+            followers_count = int(followers_count_match.group(1))
+            if followers_count < 50:
+                return "This account is flagged as fake (low followers)."
+            return "This account seems legit."
+        else:
+            return "Unable to check followers count."
+    
+    except Exception as e:
+        print(f"Error checking account: {e}")
+        return "Error checking account."
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    result = None
+    error = None
+    if request.method == 'POST':
+        cookies = request.form.get('cookies', '').strip()
+        if not cookies:
+            error = "Please provide Instagram cookies."
+        else:
+            result = check_fake_account(cookies)
+    
+    return render_template_string(HTML_TEMPLATE, result=result, error=error)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+    
