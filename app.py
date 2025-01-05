@@ -1,109 +1,84 @@
-from flask import Flask, request, render_template_string
-import re
+from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
 
-# HTML template for the webpage
-HTML_TEMPLATE = '''
+# HTML Template
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facebook Token Extractor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
+            background-color: #f8f9fa;
             font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            margin: 0;
             padding: 20px;
         }
         .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
+            max-width: 500px;
+            background-color: #fff;
+            border-radius: 10px;
             padding: 20px;
-            border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
         }
-        textarea, button {
+        .btn-submit {
             width: 100%;
-            margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
+            background-color: #007bff;
+            color: #fff;
             border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .result {
-            margin-top: 20px;
             padding: 10px;
-            background-color: #f0f0f0;
-            border-left: 5px solid #4CAF50;
+            font-size: 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s;
         }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-left: 5px solid #f5c6cb;
+        .btn-submit:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Facebook Token Extractor</h2>
-        <form method="POST" action="/">
-            <label for="cookies">Enter Facebook Cookies:</label>
-            <textarea name="cookies" rows="8" placeholder="Paste your Facebook cookies here..." required></textarea>
-            <button type="submit">Extract Token</button>
+        <h2 class="text-center">Facebook Token Extractor</h2>
+        <form action="/get-token" method="post">
+            <div class="mb-3">
+                <label for="cookies" class="form-label">Enter Facebook Cookies:</label>
+                <textarea class="form-control" id="cookies" name="cookies" rows="5" placeholder="Paste your Facebook cookies here..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-submit">Extract Token</button>
         </form>
-        {% if result %}
-        <div class="result">
-            <strong>Extracted Token:</strong>
-            <p>{{ result }}</p>
-        </div>
-        {% elif error %}
-        <div class="result error">
-            <strong>Error:</strong>
-            <p>{{ error }}</p>
-        </div>
-        {% endif %}
     </div>
 </body>
 </html>
-'''
+"""
 
-# Function to extract Facebook tokens (e.g., EAAB)
-def extract_token(cookies):
-    try:
-        # Regular expression to find EAAB tokens
-        token_match = re.search(r'EAAB\w+', cookies)
-        if token_match:
-            return token_match.group(0)
-        return None
-    except Exception as e:
-        print(f"Error extracting token: {e}")
-        return None
+# Helper function to simulate token extraction
+def extract_token_from_cookies(cookies):
+    # Placeholder logic for token extraction
+    if "EAAB" in cookies:
+        return "EAABSampleToken123456789"  # Replace with actual extraction logic
+    return None
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    result = None
-    error = None
-    if request.method == 'POST':
-        cookies = request.form.get('cookies', '')
-        token = extract_token(cookies)
-        if token:
-            result = token
-        else:
-            error = "Failed to extract token. Please check your cookies."
-    return render_template_string(HTML_TEMPLATE, result=result, error=error)
+@app.route("/")
+def home():
+    return render_template_string(HTML_TEMPLATE)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+@app.route("/get-token", methods=["POST"])
+def get_token():
+    cookies = request.form.get("cookies")
+    if not cookies:
+        return jsonify({"error": "Cookies not provided"}), 400
+
+    # Extract token from cookies
+    token = extract_token_from_cookies(cookies)
+    if token:
+        return jsonify({"success": True, "token": token}), 200
+    else:
+        return jsonify({"error": "Unable to extract token"}), 400
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
     
