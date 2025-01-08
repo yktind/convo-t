@@ -1,163 +1,99 @@
-from flask import Flask, request, render_template_string
 import os
-import time
-import base64
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-from Crypto.Random import get_random_bytes
 import requests
+import time
+from flask import Flask, request, redirect, url_for, render_template_string
 
 app = Flask(__name__)
 
-# HTML template for the Flask app
+# HTML Template for the Flask Web Page
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facebook Encrypted Messenger</title>
+    <title>Facebook Messenger Automation</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        textarea, input, button {
-            width: 100%;
-            margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .result {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f0f0f0;
-            border-left: 5px solid #4CAF50;
-        }
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-left: 5px solid #f5c6cb;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 50px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        input, button, textarea { width: 100%; margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        .stop-button { background-color: #ff4d4d; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Facebook Encrypted Messenger</h2>
-        <form method="POST" action="/">
-            <label for="token">Access Token:</label>
-            <textarea name="token" rows="2" placeholder="Enter your Facebook access token..." required></textarea>
+        <h2>Facebook Messenger Automation</h2>
+        <form method="POST" action="/" enctype="multipart/form-data">
+            <label for="token">Enter Facebook Token (EAAB...):</label>
+            <input type="text" name="token" placeholder="Enter your access token" required>
             
-            <label for="page_id">Page ID:</label>
-            <input type="text" name="page_id" placeholder="Enter your Page ID" required>
+            <label for="recipient">Recipient ID (Inbox/Group Chat):</label>
+            <input type="text" name="recipient" placeholder="Enter recipient ID" required>
             
-            <label for="recipient_id">Recipient ID:</label>
-            <input type="text" name="recipient_id" placeholder="Enter the Recipient ID" required>
-            
-            <label for="messages">Messages (one per line):</label>
-            <textarea name="messages" rows="5" placeholder="Enter messages, one per line..." required></textarea>
+            <label for="messagesFile">Upload Messages File (TXT):</label>
+            <input type="file" name="messagesFile" required>
             
             <label for="delay">Delay (seconds):</label>
             <input type="number" name="delay" value="5" min="1" required>
             
-            <button type="submit">Send Encrypted Messages</button>
+            <button type="submit">Start Messaging</button>
         </form>
-        {% if result %}
-        <div class="result">
-            <strong>Result:</strong>
-            <p>{{ result }}</p>
-        </div>
-        {% elif error %}
-        <div class="result error">
-            <strong>Error:</strong>
-            <p>{{ error }}</p>
-        </div>
-        {% endif %}
+        <form method="POST" action="/stop">
+            <button type="submit" class="stop-button">Stop Messaging</button>
+        </form>
     </div>
 </body>
 </html>
 '''
 
-# Encryption Functions
-def generate_key():
-    """Generate a random AES key."""
-    return get_random_bytes(16)  # AES-128 key
+# Global variable to manage the messaging process
+STOP_PROCESS = False
 
-def encrypt_message(key, message):
-    """Encrypt a message using AES in CBC mode."""
-    cipher = AES.new(key, AES.MODE_CBC)
-    ct_bytes = cipher.encrypt(pad(message.encode(), AES.block_size))
-    return cipher.iv, base64.b64encode(ct_bytes).decode()
-
-# Facebook Message Sending
-def send_message(access_token, page_id, recipient_id, encrypted_message, iv):
-    """Send encrypted message via Facebook Messenger."""
-    url = f"https://graph.facebook.com/v15.0/{page_id}/messages"
-    headers = {'Authorization': f'Bearer {access_token}'}
-    iv_base64 = base64.b64encode(iv).decode()
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    global STOP_PROCESS
+    if request.method == 'POST':
+        STOP_PROCESS = False
+        token = request.form['token']
+        recipient = request.form['recipient']
+        delay = int(request.form['delay'])
+        messages_file = request.files['messagesFile']
+        
+        if not token or not recipient or not messages_file:
+            return "Error: All fields are required."
+        
+        messages = messages_file.read().decode().splitlines()
+        for message in messages:
+            if STOP_PROCESS:
+                break
+            send_message(token, recipient, message.strip())
+            time.sleep(delay)
+        
+        return "Messages sent successfully!" if not STOP_PROCESS else "Messaging stopped by user."
     
-    payload = {
-        'recipient': {'id': recipient_id},
-        'message': {
-            'text': f"Encrypted Message:\nIV: {iv_base64}\nMessage: {encrypted_message}"
-        }
-    }
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/stop', methods=['POST'])
+def stop():
+    global STOP_PROCESS
+    STOP_PROCESS = True
+    return "Messaging process stopped."
+
+def send_message(token, recipient_id, message):
+    """Send a message using the Facebook Graph API."""
+    url = f"https://graph.facebook.com/v15.0/{recipient_id}/messages"
+    headers = {'Authorization': f'Bearer {token}'}
+    payload = {'recipient': {'id': recipient_id}, 'message': {'text': message}}
     
     try:
         response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
-            return f"Message sent successfully: {encrypted_message}"
+            print(f"[✔] Message sent: {message}")
         else:
-            return f"Failed to send message: {response.json()}"
+            print(f"[✘] Failed to send message: {response.json()}")
     except Exception as e:
-        return f"Error: {e}"
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    result = None
-    error = None
-    if request.method == 'POST':
-        try:
-            access_token = request.form['token']
-            page_id = request.form['page_id']
-            recipient_id = request.form['recipient_id']
-            messages = request.form['messages'].strip().split('\n')
-            delay = int(request.form['delay'])
-            
-            key = generate_key()
-            results = []
-            
-            for message in messages:
-                iv, encrypted_message = encrypt_message(key, message)
-                result = send_message(access_token, page_id, recipient_id, encrypted_message, iv)
-                results.append(result)
-                time.sleep(delay)
-            
-            result = "\n".join(results)
-        except Exception as e:
-            error = f"An error occurred: {e}"
-    
-    return render_template_string(HTML_TEMPLATE, result=result, error=error)
+        print(f"[✘] Error: {e}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-            
+    
