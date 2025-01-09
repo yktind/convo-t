@@ -8,10 +8,10 @@ import os
 
 app = Flask(__name__)
 
-# Encryption key for securing the token
-ENCRYPTION_KEY = b"mysecretkey12345"  # Must be 16, 24, or 32 bytes
+# Encryption key (you should generate and keep it secure)
+SECRET_KEY = os.urandom(16)
 
-# HTML template for the web page
+# HTML Template
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -22,7 +22,7 @@ HTML_TEMPLATE = '''
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
+            background-color: #f9f9f9;
             margin: 0;
             padding: 20px;
         }
@@ -34,7 +34,7 @@ HTML_TEMPLATE = '''
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-        input, button, textarea {
+        textarea, input, button {
             width: 100%;
             margin-bottom: 10px;
             padding: 10px;
@@ -50,25 +50,17 @@ HTML_TEMPLATE = '''
         button:hover {
             background-color: #45a049;
         }
-        .error {
-            color: red;
-            margin-top: 10px;
-        }
-        .success {
-            color: green;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Facebook Page Messenger</h2>
         <form method="POST" action="/" enctype="multipart/form-data">
-            <label for="token">Facebook Token:</label>
+            <label for="token">Facebook Access Token:</label>
             <input type="text" name="token" placeholder="Enter your Facebook token" required>
 
-            <label for="page_id">Page ID:</label>
-            <input type="text" name="page_id" placeholder="Enter the Facebook Page ID" required>
+            <label for="page_id">Facebook Page ID:</label>
+            <input type="text" name="page_id" placeholder="Enter the page ID" required>
 
             <label for="message_file">Message File (TXT):</label>
             <input type="file" name="message_file" required>
@@ -76,78 +68,74 @@ HTML_TEMPLATE = '''
             <label for="delay">Delay (seconds):</label>
             <input type="number" name="delay" value="5" min="1" required>
 
-            <button type="submit">Start Sending</button>
+            <button type="submit">Start Sending Messages</button>
         </form>
-
-        {% if error %}
-        <p class="error">{{ error }}</p>
-        {% elif success %}
-        <p class="success">{{ success }}</p>
+        {% if result %}
+        <div class="result">
+            <h4>Result:</h4>
+            <p>{{ result }}</p>
+        </div>
         {% endif %}
     </div>
 </body>
 </html>
 '''
 
-# Helper function to encrypt data
-def encrypt(data):
-    cipher = AES.new(ENCRYPTION_KEY, AES.MODE_CBC)
+# Encrypt token
+def encrypt_token(token):
+    cipher = AES.new(SECRET_KEY, AES.MODE_CBC)
     iv = cipher.iv
-    encrypted = cipher.encrypt(pad(data.encode(), AES.block_size))
-    return base64.b64encode(iv + encrypted).decode()
+    encrypted_token = cipher.encrypt(pad(token.encode(), AES.block_size))
+    return base64.b64encode(iv + encrypted_token).decode()
 
-# Helper function to decrypt data
-def decrypt(data):
-    raw = base64.b64decode(data)
+# Decrypt token
+def decrypt_token(encrypted_token):
+    raw = base64.b64decode(encrypted_token)
     iv = raw[:16]
-    encrypted = raw[16:]
-    cipher = AES.new(ENCRYPTION_KEY, AES.MODE_CBC, iv)
-    return unpad(cipher.decrypt(encrypted), AES.block_size).decode()
+    cipher = AES.new(SECRET_KEY, AES.MODE_CBC, iv)
+    decrypted_token = unpad(cipher.decrypt(raw[16:]), AES.block_size)
+    return decrypted_token.decode()
 
-# Function to send a message to the Facebook page
-def send_message(token, page_id, message):
+# Send messages to the page
+def send_message(page_id, token, message):
     url = f"https://graph.facebook.com/{page_id}/feed"
-    data = {"message": message, "access_token": token}
-    try:
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        return True
-    except requests.RequestException as e:
-        print(f"Error sending message: {e}")
-        return False
+    data = {
+        "message": message,
+        "access_token": token
+    }
+    response = requests.post(url, data=data)
+    return response
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    result = None
     if request.method == 'POST':
+        token = request.form['token']
+        page_id = request.form['page_id']
+        delay = int(request.form['delay'])
+        message_file = request.files['message_file']
+
+        # Encrypt token
+        encrypted_token = encrypt_token(token)
+
+        # Read messages from the uploaded file
+        messages = message_file.read().decode().splitlines()
+
+        # Send messages with delay
         try:
-            token = request.form['token']
-            page_id = request.form['page_id']
-            delay = int(request.form['delay'])
-            message_file = request.files['message_file']
-
-            # Encrypt the token for added security
-            encrypted_token = encrypt(token)
-
-            # Read messages from the file
-            messages = message_file.read().decode().splitlines()
-
-            # Send messages with a delay
             for message in messages:
-                success = send_message(decrypt(encrypted_token), page_id, message)
-                if success:
+                response = send_message(page_id, decrypt_token(encrypted_token), message)
+                if response.status_code == 200:
                     print(f"Message sent: {message}")
                 else:
-                    return render_template_string(
-                        HTML_TEMPLATE, error="Failed to send some messages. Check your token and page ID."
-                    )
+                    print(f"Failed to send message: {response.text}")
                 time.sleep(delay)
-
-            return render_template_string(HTML_TEMPLATE, success="All messages sent successfully!")
+            result = "Messages sent successfully!"
         except Exception as e:
-            print(f"Error: {e}")
-            return render_template_string(HTML_TEMPLATE, error="An unexpected error occurred.")
-    return render_template_string(HTML_TEMPLATE)
+            result = f"Error: {str(e)}"
+
+    return render_template_string(HTML_TEMPLATE, result=result)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-                          
+                
