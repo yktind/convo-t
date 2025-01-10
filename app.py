@@ -1,15 +1,9 @@
-from flask import Flask, request, render_template_string, redirect, url_for
+from flask import Flask, request, render_template_string, flash, redirect, url_for
+from instagrapi import Client
 import time
-import requests
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-import base64
-import os
 
 app = Flask(__name__)
-
-# Encryption key (you should generate and keep it secure)
-SECRET_KEY = os.urandom(16)
+app.secret_key = "your_secret_key"
 
 # HTML Template
 HTML_TEMPLATE = '''
@@ -18,124 +12,131 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facebook Page Messenger</title>
+    <title>Instagram Group Message Sender</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
+            background-color: #f8f9fa;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
         .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
+            background-color: #ffffff;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        textarea, input, button {
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
             width: 100%;
-            margin-bottom: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin: 10px 0 5px;
+        }
+        input, button {
+            width: 100%;
             padding: 10px;
+            margin-bottom: 15px;
             border: 1px solid #ccc;
             border-radius: 5px;
+            font-size: 16px;
         }
         button {
-            background-color: #4CAF50;
-            color: white;
+            background-color: #007bff;
+            color: #fff;
             border: none;
             cursor: pointer;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #0056b3;
+        }
+        .info {
+            font-size: 12px;
+            color: #777;
+            margin-bottom: -10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Facebook Page Messenger</h2>
-        <form method="POST" action="/" enctype="multipart/form-data">
-            <label for="token">Facebook Access Token:</label>
-            <input type="text" name="token" placeholder="Enter your Facebook token" required>
+        <h1>Instagram Group Messenger</h1>
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <label for="username">Instagram Username:</label>
+            <input type="text" id="username" name="username" placeholder="Enter your username" required>
 
-            <label for="page_id">Facebook Page ID:</label>
-            <input type="text" name="page_id" placeholder="Enter the page ID" required>
+            <label for="password">Instagram Password:</label>
+            <input type="password" id="password" name="password" placeholder="Enter your password" required>
 
-            <label for="message_file">Message File (TXT):</label>
-            <input type="file" name="message_file" required>
+            <label for="group_id">Group Thread ID:</label>
+            <input type="text" id="group_id" name="group_id" placeholder="Enter group thread ID" required>
+
+            <label for="message_file">Message File:</label>
+            <input type="file" id="message_file" name="message_file" required>
+            <p class="info">Upload a file containing messages, one per line.</p>
 
             <label for="delay">Delay (seconds):</label>
-            <input type="number" name="delay" value="5" min="1" required>
+            <input type="number" id="delay" name="delay" placeholder="Enter delay in seconds" required>
 
-            <button type="submit">Start Sending Messages</button>
+            <button type="submit">Send Messages</button>
         </form>
-        {% if result %}
-        <div class="result">
-            <h4>Result:</h4>
-            <p>{{ result }}</p>
-        </div>
-        {% endif %}
     </div>
 </body>
 </html>
 '''
 
-# Encrypt token
-def encrypt_token(token):
-    cipher = AES.new(SECRET_KEY, AES.MODE_CBC)
-    iv = cipher.iv
-    encrypted_token = cipher.encrypt(pad(token.encode(), AES.block_size))
-    return base64.b64encode(iv + encrypted_token).decode()
-
-# Decrypt token
-def decrypt_token(encrypted_token):
-    raw = base64.b64decode(encrypted_token)
-    iv = raw[:16]
-    cipher = AES.new(SECRET_KEY, AES.MODE_CBC, iv)
-    decrypted_token = unpad(cipher.decrypt(raw[16:]), AES.block_size)
-    return decrypted_token.decode()
-
-# Send messages to the page
-def send_message(page_id, token, message):
-    url = f"https://graph.facebook.com/{page_id}/feed"
-    data = {
-        "message": message,
-        "access_token": token
-    }
-    response = requests.post(url, data=data)
-    return response
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    result = None
-    if request.method == 'POST':
-        token = request.form['token']
-        page_id = request.form['page_id']
-        delay = int(request.form['delay'])
-        message_file = request.files['message_file']
-
-        # Encrypt token
-        encrypted_token = encrypt_token(token)
-
-        # Read messages from the uploaded file
-        messages = message_file.read().decode().splitlines()
-
-        # Send messages with delay
+# Flask Route
+@app.route("/", methods=["GET", "POST"])
+def send_messages():
+    if request.method == "POST":
         try:
+            # Get form data
+            username = request.form["username"]
+            password = request.form["password"]
+            group_id = request.form["group_id"]
+            delay = int(request.form["delay"])
+            message_file = request.files["message_file"]
+
+            # Validate message file
+            messages = message_file.read().decode("utf-8").splitlines()
+            if not messages:
+                flash("Message file is empty!", "error")
+                return redirect(url_for("send_messages"))
+
+            # Login to Instagram
+            cl = Client()
+            try:
+                cl.login(username, password)
+            except Exception as e:
+                flash(f"Login failed: {e}", "error")
+                return redirect(url_for("send_messages"))
+
+            # Send messages to the group
             for message in messages:
-                response = send_message(page_id, decrypt_token(encrypted_token), message)
-                if response.status_code == 200:
-                    print(f"Message sent: {message}")
-                else:
-                    print(f"Failed to send message: {response.text}")
+                try:
+                    cl.direct_send(message, thread_ids=[group_id])
+                    flash(f"Sent message: {message}", "success")
+                except Exception as e:
+                    flash(f"Failed to send message: {message}. Error: {e}", "error")
                 time.sleep(delay)
-            result = "Messages sent successfully!"
+
+            flash("All messages sent successfully!", "success")
+            return redirect(url_for("send_messages"))
+
         except Exception as e:
-            result = f"Error: {str(e)}"
+            flash(f"An error occurred: {e}", "error")
+            return redirect(url_for("send_messages"))
 
-    return render_template_string(HTML_TEMPLATE, result=result)
+    return render_template_string(HTML_TEMPLATE)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-                
+# Run the Flask app
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
