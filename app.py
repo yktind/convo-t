@@ -110,7 +110,7 @@ divserzeugen();
             <p class="text-center">Secure Convo/Inbox Web Tool</p>
 
             <div class="alert alert-{{ messages[0][0] }} alert-dismissible fade show" role="alert">
-                {{ messages[0][1] }}
+            
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             
