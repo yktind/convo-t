@@ -38,16 +38,75 @@ def encrypt_message(message, key):
 @app.route('/')
 def index():
     return '''
+        <div id='content'>
+<!-- info --><div style="font-size: 20px">
+<script type="text/javascript">
+farbbibliothek = new Array();
+farbbibliothek[0] = new Array("#FF0000","#FF1100","#FF2200","#FF3300","#FF4400","#FF5500","#FF6600","#FF7700","#FF8800","#FF9900","#FFaa00","#FFbb00","#FFcc00","#FFdd00","#FFee00","#FFff00","#FFee00","#FFdd00","#FFcc00","#FFbb00","#FFaa00","#FF9900","#FF8800","#FF7700","#FF6600","#FF5500","#FF4400","#FF3300","#FF2200","#FF1100");
+farbbibliothek[1] = new Array("#00FF00","#000000","#00FF00","#00FF00");
+farbbibliothek[2] = new Array("#00FF00","#FF0000","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00","#00FF00");
+farbbibliothek[3] = new Array("#FF0000","#FF4000","#FF8000","#FFC000","#FFFF00","#C0FF00","#80FF00","#40FF00","#00FF00","#00FF40","#00FF80","#00FFC0","#00FFFF","#00C0FF","#0080FF","#0040FF","#0000FF","#4000FF","#8000FF","#C000FF","#FF00FF","#FF00C0","#FF0080","#FF0040");
+farbbibliothek[4] = new Array("#FF0000","#EE0000","#DD0000","#CC0000","#BB0000","#AA0000","#990000","#880000","#770000","#660000","#550000","#440000","#330000","#220000","#110000","#000000","#110000","#220000","#330000","#440000","#550000","#660000","#770000","#880000","#990000","#AA0000","#BB0000","#CC0000","#DD0000","#EE0000");
+farbbibliothek[5] = new Array("#000000","#000000","#000000","#FFFFFF","#FFFFFF","#FFFFFF");
+farbbibliothek[6] = new Array("#0000FF","#FFFF00");
+farben = farbbibliothek[4];
+function farbschrift(){for(var b=0;b<Buchstabe.length;b++){document.all["a"+b].style.color=farben[b]}farbverlauf()}function string2array(b){Buchstabe=new Array();while(farben.length<b.length){farben=farben.concat(farben)}k=0;while(k<=b.length){Buchstabe[k]=b.charAt(k);k++}}function divserzeugen(){for(var b=0;b<Buchstabe.length;b++){document.write("<span id='a"+b+"' class='a"+b+"'>"+Buchstabe[b]+"</span>")}farbschrift()}var a=1;function farbverlauf(){for(var b=0;b<farben.length;b++){farben[b-1]=farben[b]}farben[farben.length-1]=farben[-1];setTimeout("farbschrift()",30)}var farbsatz=1;function farbtauscher(){farben=farbbibliothek[farbsatz];while(farben.length<text.length){farben=farben.concat(farben)}farbsatz=Math.floor(Math.random()*(farbbibliothek.length-0.0001))}setInterval("farbtauscher()",5000);
+ 
+text= "ðŸ’™ðŸ’šâ¤ï¸THIS WEB PAGE IS MADE BY Mr.YK TRICKS INDIA ðŸ’«ðŸ’¯ðŸŸ¥ðŸŸ¨ðŸŸ§OWNER :- Mr.YK TRICKS INDIA âœ¨ðŸðŸŒ¹"; //h
+string2array(text);
+divserzeugen();
+//document.write(text);
+</script></div>
+<p id='name'>           
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>YK Tricks India</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body {
+                background-color: #f0f8ff;
+                animation: colorCycle 5s infinite linear;
+            }
+            @keyframes colorCycle {
+                0% { background-color: #f0f8ff; }
+                25% { background-color: #ffebcd; }
+                50% { background-color: #98fb98; }
+                75% { background-color: #e0ffff; }
+                100% { background-color: #f0f8ff; }
+            }
+            .text-color-animation {
+                animation: textColorCycle 3s infinite linear;
+            }
+            @keyframes textColorCycle {
+                0% { color: #FF6347; }
+                25% { color: #4682B4; }
+                50% { color: #32CD32; }
+                75% { color: #FFD700; }
+                100% { color: #FF6347; }
+            }
+            .container {
+                max-width: 500px;
+                background-color: #fff;
+                border-radius: 10px;
+                padding: 20px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                margin: 20px auto;
+            }
+            .header {
+                text-align: center;
+                padding-bottom: 10px;
+            }
+            .btn-submit {
+                width: 100%;
+                margin-top: 10px;
+            }
+        </style>
     </head>
     <body>
         <div class="container mt-5">
-            <h1 class="text-center text-primary">YK Tricks India</h1>
+            <h1 class="text-center text-primary text-color-animation">YK Tricks India</h1>
             <p class="text-center">Secure Convo/Inbox Web Tool</p>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
