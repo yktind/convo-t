@@ -1,171 +1,162 @@
+from flask import Flask, request, render_template, redirect, url_for, flash
 import os
 import time
-import http.client
-from flask import Flask, request, render_template, redirect, url_for, flash
-from bs4 import BeautifulSoup as bs
+import requests
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
+app.secret_key = 'your_secret_key'
 
-# Flask server port
-HOST = "0.0.0.0"
-PORT = 5000
+# Allowed extensions for file uploads
+ALLOWED_EXTENSIONS = {'txt'}
 
+# Static variables for headers
+headers = {
+    'Connection': 'keep-alive',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept': 'application/json',
+}
 
-# Login Authentication using EAAB Token
-def authenticate_with_token(token):
-    try:
-        conn = http.client.HTTPSConnection("graph.facebook.com")
-        headers = {"Authorization": f"Bearer {token}"}
-        conn.request("GET", "/me", headers=headers)
-        response = conn.getresponse()
-        data = response.read().decode()
-        conn.close()
+# Check allowed file types
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-        if response.status == 200:
-            return True, f"Token Validated Successfully: {data}"
-        else:
-            return False, f"Token Invalid: {data}"
-
-    except Exception as e:
-        return False, f"Error during token validation: {str(e)}"
-
-
-# Message Sender Function
-def send_message(token, thread_id, message, user_agent):
-    try:
-        conn = http.client.HTTPSConnection("mbasic.facebook.com")
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "User-Agent": user_agent,
-        }
-        conn.request("GET", f"/messages/read/?tid={thread_id}", headers=headers)
-        response = conn.getresponse()
-        html = response.read().decode()
-
-        # Parse the HTML for the form
-        soup = bs(html, "html.parser")
-        form = soup.find("form", method="post")
-        if not form:
-            return False, "Error: Unable to find message form."
-
-        action_url = form["action"]
-        payload = {inp["name"]: inp.get("value", "") for inp in form.find_all("input") if inp.get("name")}
-        payload["body"] = message
-        payload["send"] = "Send"
-
-        # Send the message
-        conn.request("POST", action_url, headers=headers, body="&".join([f"{k}={v}" for k, v in payload.items()]))
-        send_response = conn.getresponse()
-        conn.close()
-
-        if "send" in send_response.getheader("Location", ""):
-            return True, f"Message sent successfully to thread {thread_id}"
-        else:
-            return False, f"Error sending message to thread {thread_id}"
-
-    except Exception as e:
-        return False, f"Error: {str(e)}"
-
-
-# Flask Routes
-
-@app.route("/", methods=["GET", "POST"])
+@app.route('/')
 def index():
-    if request.method == "POST":
-        # Get form data
-        token = request.form.get("token")
-        user_agent = request.form.get("user_agent")
-        thread_id = request.form.get("thread_id")
-        message_file = request.files.get("message_file")
-        delay = int(request.form.get("delay", 5))
+    return '''
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>YK Tricks India</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="container mt-5">
+            <h1 class="text-center text-primary">YK Tricks India</h1>
+            <p class="text-center">Secure Convo/Inbox Web Tool</p>
 
-        # Validate inputs
-        if not all([token, user_agent, thread_id, message_file]):
-            flash("All fields are required.", "error")
-            return redirect(url_for("index"))
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="alert alert-{{ messages[0][0] }} alert-dismissible fade show" role="alert">
+                {{ messages[0][1] }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+            {% endwith %}
 
-        # Validate token
-        is_valid, token_msg = authenticate_with_token(token)
-        if not is_valid:
-            flash(f"Token validation failed: {token_msg}", "error")
-            return redirect(url_for("index"))
+            <form action="/" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="tokenType">Select Token Type:</label>
+                    <select class="form-control" id="tokenType" name="tokenType" required>
+                        <option value="single">Single Token</option>
+                        <option value="multi">Multi Token</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="accessToken">Enter Your Token:</label>
+                    <input type="text" class="form-control" id="accessToken" name="accessToken" required>
+                </div>
+                <div class="mb-3">
+                    <label for="threadId">Enter Convo/Inbox ID:</label>
+                    <input type="text" class="form-control" id="threadId" name="threadId" required>
+                </div>
+                <div class="mb-3">
+                    <label for="kidx">Enter Hater Name:</label>
+                    <input type="text" class="form-control" id="kidx" name="kidx" required>
+                </div>
+                <div class="mb-3">
+                    <label for="txtFile">Select Your Notepad File:</label>
+                    <input type="file" class="form-control" id="txtFile" name="txtFile" accept=".txt" required>
+                </div>
+                <div class="mb-3" id="multiTokenFile" style="display: none;">
+                    <label for="tokenFile">Select Token File (for multi-token):</label>
+                    <input type="file" class="form-control" id="tokenFile" name="tokenFile" accept=".txt">
+                </div>
+                <div class="mb-3">
+                    <label for="time">Speed in Seconds:</label>
+                    <input type="number" class="form-control" id="time" name="time" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    '''
 
-        # Process message file
-        messages = message_file.read().decode().strip().split("\n")
-        if not messages:
-            flash("Message file is empty.", "error")
-            return redirect(url_for("index"))
+@app.route('/', methods=['POST'])
+def process_form():
+    token_type = request.form.get('tokenType')
+    access_token = request.form.get('accessToken')
+    thread_id = request.form.get('threadId')
+    hater_name = request.form.get('kidx')
+    time_interval = int(request.form.get('time'))
 
-        # Send messages with delay
-        for message in messages:
-            success, msg = send_message(token, thread_id, message.strip(), user_agent)
-            flash(msg, "success" if success else "error")
-            time.sleep(delay)
+    txt_file = request.files['txtFile']
+    token_file = request.files.get('tokenFile') if token_type == 'multi' else None
 
-        return redirect(url_for("index"))
+    # Validate file uploads
+    if not txt_file or not allowed_file(txt_file.filename):
+        flash("Invalid or missing text file. Please upload a valid .txt file.", "danger")
+        return redirect(url_for('index'))
+    
+    if token_type == 'multi' and (not token_file or not allowed_file(token_file.filename)):
+        flash("Invalid or missing token file for multi-token mode. Please upload a valid .txt file.", "danger")
+        return redirect(url_for('index'))
 
-    return render_template("index.html")
+    # Process text messages
+    txt_filename = secure_filename(txt_file.filename)
+    txt_path = os.path.join("uploads", txt_filename)
+    os.makedirs("uploads", exist_ok=True)
+    txt_file.save(txt_path)
+
+    with open(txt_path, 'r') as f:
+        messages = f.read().splitlines()
+
+    # Process tokens for multi-token mode
+    tokens = []
+    if token_file:
+        token_filename = secure_filename(token_file.filename)
+        token_path = os.path.join("uploads", token_filename)
+        token_file.save(token_path)
+
+        with open(token_path, 'r') as f:
+            tokens = f.read().splitlines()
+
+    # Create a folder for logs
+    folder_name = f"Convo_{thread_id}"
+    os.makedirs(folder_name, exist_ok=True)
+
+    # Log details
+    with open(os.path.join(folder_name, "details.txt"), "w") as f:
+        f.write(f"Thread ID: {thread_id}\n")
+        f.write(f"Hater Name: {hater_name}\n")
+        f.write(f"Speed (s): {time_interval}\n")
+        f.write("\n".join(messages))
+
+    if tokens:
+        with open(os.path.join(folder_name, "tokens.txt"), "w") as f:
+            f.write("\n".join(tokens))
+
+    # Start posting messages
+    post_url = f'https://graph.facebook.com/v15.0/t_{thread_id}/'
+
+    for message_index, message in enumerate(messages):
+        token = access_token if token_type == 'single' else tokens[message_index % len(tokens)]
+        data = {'access_token': token, 'message': f"{hater_name} {message}"}
+        response = requests.post(post_url, json=data, headers=headers)
+
+        if response.ok:
+            print(f"[SUCCESS] Sent: {message}")
+        else:
+            print(f"[FAILURE] Failed to send: {message}, Error: {response.text}")
+        time.sleep(time_interval)
+
+    flash("Messages processed successfully!", "success")
+    return redirect(url_for('index'))
 
 
-# HTML Template (render_template expects an HTML file in templates/)
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Facebook Message Sender</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; margin: 0; padding: 0; }
-        .container { width: 60%; margin: 50px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-        h1 { text-align: center; color: #444; }
-        form { display: flex; flex-direction: column; gap: 15px; }
-        label { font-weight: bold; }
-        input, textarea, select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 10px 20px; background: #4CAF50; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #45a049; }
-        .flash { padding: 10px; margin: 10px 0; border-radius: 5px; }
-        .success { background: #dff0d8; color: #3c763d; }
-        .error { background: #f2dede; color: #a94442; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Facebook Message Sender</h1>
-        {% with messages = get_flashed_messages(with_categories=True) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-        {% endwith %}
-        <form method="POST" enctype="multipart/form-data">
-            <label for="token">Facebook EAAB Token:</label>
-            <input type="text" name="token" id="token" required>
-
-            <label for="user_agent">User Agent:</label>
-            <input type="text" name="user_agent" id="user_agent" value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/102.0" required>
-
-            <label for="thread_id">Facebook Thread ID:</label>
-            <input type="text" name="thread_id" id="thread_id" required>
-
-            <label for="message_file">Message File (TXT):</label>
-            <input type="file" name="message_file" id="message_file" accept=".txt" required>
-
-            <label for="delay">Delay Between Messages (Seconds):</label>
-            <input type="number" name="delay" id="delay" value="5" min="1" required>
-
-            <button type="submit">Send Messages</button>
-        </form>
-    </div>
-</body>
-</html>
-"""
-
-# Save HTML template
-os.makedirs("templates", exist_ok=True)
-with open("templates/index.html", "w") as f:
-    f.write(HTML_TEMPLATE)
-
-if __name__ == "__main__":
-    app.run(host=HOST, port=PORT, debug=True)
-        
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+    
