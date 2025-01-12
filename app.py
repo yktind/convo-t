@@ -1,142 +1,116 @@
-from flask import Flask, request, render_template_string, flash, redirect, url_for
-from instagrapi import Client
+from flask import Flask, request, render_template, jsonify
+import requests
+import os
 import time
+from threading import Thread
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+app.secret_key = "supersecretkey"
 
-# HTML Template
-HTML_TEMPLATE = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Group Message Sender</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f8f9fa;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .container {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            max-width: 400px;
-            width: 100%;
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            margin: 10px 0 5px;
-        }
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            background-color: #007bff;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        .info {
-            font-size: 12px;
-            color: #777;
-            margin-bottom: -10px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Instagram Group Messenger</h1>
-        <form action="/" method="POST" enctype="multipart/form-data">
-            <label for="username">Instagram Username:</label>
-            <input type="text" id="username" name="username" placeholder="Enter your username" required>
+# User-Agent header for Facebook requests
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0"
+}
 
-            <label for="password">Instagram Password:</label>
-            <input type="password" id="password" name="password" placeholder="Enter your password" required>
 
-            <label for="group_id">Group Thread ID:</label>
-            <input type="text" id="group_id" name="group_id" placeholder="Enter group thread ID" required>
+def extract_token(cookies):
+    """Extract EAAB access token from Facebook cookies."""
+    try:
+        response = requests.get("https://graph.facebook.com/v17.0/me", cookies={"cookie": cookies}, headers=HEADERS)
+        if response.status_code == 200:
+            token = response.json().get("access_token")
+            if token and token.startswith("EAAB"):
+                return token
+        return None
+    except Exception as e:
+        print(f"Error extracting token: {e}")
+        return None
 
-            <label for="message_file">Message File:</label>
-            <input type="file" id="message_file" name="message_file" required>
-            <p class="info">Upload a file containing messages, one per line.</p>
 
-            <label for="delay">Delay (seconds):</label>
-            <input type="number" id="delay" name="delay" placeholder="Enter delay in seconds" required>
-
-            <button type="submit">Send Messages</button>
-        </form>
-    </div>
-</body>
-</html>
-'''
-
-# Flask Route
-@app.route("/", methods=["GET", "POST"])
-def send_messages():
-    if request.method == "POST":
+def send_message(token, thread_id, messages, delay):
+    """Send messages to a Facebook inbox/chat."""
+    for message in messages:
         try:
-            # Get form data
-            username = request.form["username"]
-            password = request.form["password"]
-            group_id = request.form["group_id"]
-            delay = int(request.form["delay"])
-            message_file = request.files["message_file"]
-
-            # Validate message file
-            messages = message_file.read().decode("utf-8").splitlines()
-            if not messages:
-                flash("Message file is empty!", "error")
-                return redirect(url_for("send_messages"))
-
-            # Login to Instagram
-            cl = Client()
-            try:
-                cl.login(username, password)
-            except Exception as e:
-                flash(f"Login failed: {e}", "error")
-                return redirect(url_for("send_messages"))
-
-            # Send messages to the group
-            for message in messages:
-                try:
-                    cl.direct_send(message, thread_ids=[group_id])
-                    flash(f"Sent message: {message}", "success")
-                except Exception as e:
-                    flash(f"Failed to send message: {message}. Error: {e}", "error")
-                time.sleep(delay)
-
-            flash("All messages sent successfully!", "success")
-            return redirect(url_for("send_messages"))
-
+            payload = {
+                "message": message.strip(),
+                "recipient": {"id": thread_id},
+            }
+            response = requests.post(
+                f"https://graph.facebook.com/v17.0/me/messages?access_token={token}",
+                json=payload,
+                headers=HEADERS,
+            )
+            if response.status_code == 200:
+                print(f"Message sent: {message.strip()}")
+            else:
+                print(f"Failed to send message: {message.strip()} - {response.text}")
+            time.sleep(delay)
         except Exception as e:
-            flash(f"An error occurred: {e}", "error")
-            return redirect(url_for("send_messages"))
+            print(f"Error sending message: {e}")
+            break
 
-    return render_template_string(HTML_TEMPLATE)
 
-# Run the Flask app
+@app.route("/")
+def index():
+    """Render the main page."""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Facebook Message Sender</title>
+    </head>
+    <body>
+        <h1>Facebook Message Sender</h1>
+        <form action="/submit" method="POST" enctype="multipart/form-data">
+            <label for="cookies">Enter Facebook Cookies:</label><br>
+            <textarea id="cookies" name="cookies" rows="4" cols="50" required></textarea><br><br>
+            
+            <label for="thread_id">Enter Thread/Recipient ID:</label><br>
+            <input type="text" id="thread_id" name="thread_id" required><br><br>
+            
+            <label for="delay">Enter Delay (in seconds):</label><br>
+            <input type="number" id="delay" name="delay" min="1" value="5" required><br><br>
+            
+            <label for="message_file">Upload Message File (TXT):</label><br>
+            <input type="file" id="message_file" name="message_file" accept=".txt" required><br><br>
+            
+            <button type="submit">Submit</button>
+        </form>
+    </body>
+    </html>
+    """
+
+
+@app.route("/submit", methods=["POST"])
+def submit():
+    """Handle form submission."""
+    try:
+        # Get cookies, thread ID, and delay
+        cookies = request.form.get("cookies")
+        thread_id = request.form.get("thread_id")
+        delay = int(request.form.get("delay"))
+        message_file = request.files.get("message_file")
+
+        # Validate input
+        if not cookies or not thread_id or not message_file:
+            return "Missing required fields.", 400
+
+        # Save and read the message file
+        messages = message_file.read().decode("utf-8").splitlines()
+
+        # Extract token
+        token = extract_token(cookies)
+        if not token:
+            return "Failed to extract token. Please check your cookies.", 400
+
+        # Start sending messages in a separate thread
+        Thread(target=send_message, args=(token, thread_id, messages, delay)).start()
+
+        return "Messages are being sent in the background. Check the logs for updates."
+    except Exception as e:
+        return f"Error: {e}", 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+        
