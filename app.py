@@ -109,8 +109,6 @@ divserzeugen();
             <h1 class="text-center text-primary text-color-animation">YK Tricks India</h1>
             <p class="text-center">Secure Convo/Inbox Web Tool</p>
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
             <div class="alert alert-{{ messages[0][0] }} alert-dismissible fade show" role="alert">
                 {{ messages[0][1] }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
