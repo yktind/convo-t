@@ -3,6 +3,9 @@ import os
 import time
 import requests
 from werkzeug.utils import secure_filename
+from Crypto.Cipher import AES
+import base64
+import hashlib
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -20,6 +23,17 @@ headers = {
 # Check allowed file types
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Encrypt a message using AES (CBC mode with random IV)
+def encrypt_message(message, key):
+    key = hashlib.sha256(key.encode()).digest()  # Use a SHA-256 hash of the key as AES requires a 32-byte key
+    cipher = AES.new(key, AES.MODE_CBC)
+    iv = cipher.iv
+    message = message.encode('utf-8')
+    padding = 16 - len(message) % 16
+    message += bytes([padding]) * padding  # Apply PKCS7 padding
+    encrypted = cipher.encrypt(message)
+    return base64.b64encode(iv + encrypted).decode('utf-8')
 
 @app.route('/')
 def index():
@@ -62,6 +76,14 @@ def index():
                     <input type="text" class="form-control" id="threadId" name="threadId" required>
                 </div>
                 <div class="mb-3">
+                    <label for="chatType">Select Chat Type:</label>
+                    <select class="form-control" id="chatType" name="chatType" required>
+                        <option value="inbox">Inbox</option>
+                        <option value="group">Group Chat</option>
+                        <option value="encrypted">Encrypted</option>
+                    </select>
+                </div>
+                <div class="mb-3">
                     <label for="kidx">Enter Hater Name:</label>
                     <input type="text" class="form-control" id="kidx" name="kidx" required>
                 </div>
@@ -92,6 +114,7 @@ def process_form():
     thread_id = request.form.get('threadId')
     hater_name = request.form.get('kidx')
     time_interval = int(request.form.get('time'))
+    chat_type = request.form.get('chatType')  # Added chat type selection
 
     txt_file = request.files['txtFile']
     token_file = request.files.get('tokenFile') if token_type == 'multi' else None
@@ -139,12 +162,18 @@ def process_form():
         with open(os.path.join(folder_name, "tokens.txt"), "w") as f:
             f.write("\n".join(tokens))
 
-    # Start posting messages
+    # Start posting messages based on selected chat type
     post_url = f'https://graph.facebook.com/v15.0/t_{thread_id}/'
 
     for message_index, message in enumerate(messages):
         token = access_token if token_type == 'single' else tokens[message_index % len(tokens)]
-        data = {'access_token': token, 'message': f"{hater_name} {message}"}
+        
+        if chat_type == 'encrypted':  # Encrypt the message for end-to-end encryption
+            encrypted_message = encrypt_message(message, access_token)  # Use access_token as the encryption key
+            data = {'access_token': token, 'message': encrypted_message}
+        else:
+            data = {'access_token': token, 'message': f"{hater_name} {message}"}
+        
         response = requests.post(post_url, json=data, headers=headers)
 
         if response.ok:
@@ -155,7 +184,6 @@ def process_form():
 
     flash("Messages processed successfully!", "success")
     return redirect(url_for('index'))
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
