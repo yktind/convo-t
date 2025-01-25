@@ -1,99 +1,70 @@
-from flask import Flask, request, render_template_string, jsonify
+from flask import Flask, request, render_template, jsonify
+import time
+import requests
 
 app = Flask(__name__)
 
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cookie Parser & Token Extractor</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            color: #333;
-            text-align: center;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        textarea, input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #007BFF;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        .result {
-            text-align: left;
-            margin-top: 20px;
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Cookie Parser & Token Extractor</h1>
-        <form method="POST">
-            <textarea name="cookie_string" placeholder="Paste your cookie string here..." rows="5" required></textarea>
-            <button type="submit">Parse</button>
-        </form>
-        {% if cookies %}
-            <div class="result">
-                <h3>Parsed Cookies (JSON):</h3>
-                <pre>{{ cookies }}</pre>
-                <h3>Extracted Token:</h3>
-                <pre>{{ token }}</pre>
-            </div>
-        {% endif %}
-    </div>
-</body>
-</html>
-"""
-
-@app.route('/', methods=['GET', 'POST'])
-def cookie_parser():
-    cookies = None
-    token = None
-
-    if request.method == 'POST':
-        cookie_string = request.form.get('cookie_string')
-        cookies = {}
+# Home route to display the form
+@app.route('/')
+def home():
+    return '''
+    <h1>Facebook Automation</h1>
+    <form action="/send_message" method="POST" enctype="multipart/form-data">
+        <label for="token">Enter Facebook Token:</label><br>
+        <input type="text" name="token" required><br><br>
         
-        # Parse the cookie string
-        try:
-            for item in cookie_string.split(';'):
-                key, value = item.split('=', 1)
-                cookies[key.strip()] = value.strip()
-        except Exception as e:
-            return f"Error parsing cookies: {e}", 400
+        <label for="target_id">Enter Target User ID:</label><br>
+        <input type="text" name="target_id" required><br><br>
+        
+        <label for="delay">Enter Delay (seconds):</label><br>
+        <input type="number" name="delay" min="1" required><br><br>
+        
+        <label for="file">Upload Text File:</label><br>
+        <input type="file" name="file" accept=".txt" required><br><br>
+        
+        <button type="submit">Send Messages</button>
+    </form>
+    '''
 
-        # Extract the token (assuming it starts with 'EAAB')
-        token = next((v for k, v in cookies.items() if v.startswith('EAAB')), "No token found")
+# Route to process the message sending
+@app.route('/send_message', methods=['POST'])
+def send_message():
+    token = request.form['token']
+    target_id = request.form['target_id']
+    delay = int(request.form['delay'])
+    file = request.files['file']
+    
+    if not file:
+        return "No file uploaded.", 400
+    
+    # Read messages from the uploaded text file
+    messages = file.read().decode('utf-8').splitlines()
+    
+    for message in messages:
+        url = f"https://graph.facebook.com/v16.0/{target_id}/messages"
+        payload = {
+            "recipient": {"id": target_id},
+            "message": {"text": message}
+        }
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Send message using POST request
+        response = requests.post(url, json=payload, headers=headers)
+        
+        if response.status_code == 200:
+            print(f"Message sent: {message}")
+        else:
+            print(f"Failed to send message: {response.json()}")
+        
+        # Delay between messages
+        time.sleep(delay)
+    
+    return "Messages sent successfully!"
 
-    return render_template_string(HTML_TEMPLATE, cookies=jsonify(cookies).get_data(as_text=True), token=token)
-
+# Run the Flask app
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
     
