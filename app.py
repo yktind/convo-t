@@ -1,117 +1,91 @@
 from flask import Flask, request, render_template_string
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+import time
 
 app = Flask(__name__)
 
-html_page = """<!DOCTYPE html>
+HTML_TEMPLATE = '''
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get Facebook Token</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            width: 400px;
-            padding: 20px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            text-align: center;
-        }
-        textarea, input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 16px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        button:hover {
-            background-color: #218838;
-        }
-        .output {
-            margin-top: 20px;
-            font-size: 16px;
-            color: #333;
-        }
-        .copy-button {
-            margin-top: 10px;
-            padding: 5px 10px;
-            font-size: 14px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        .copy-button:hover {
-            background-color: #0056b3;
-        }
-        .connect-button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #17a2b8;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
-        }
-        .connect-button:hover {
-            background-color: #138496;
-        }
-    </style>
-    <script>
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(function() {
-                alert("Token copied to clipboard!");
-            }, function(err) {
-                alert("Failed to copy token: " + err);
-            });
-        }
-    </script>
+    <title>Messenger Bot</title>
 </head>
 <body>
-    <div class="container">
-        <h1>Get Facebook Token</h1>
-        <p>Enter your Facebook cookie below:</p>
-        <form method="post">
-            <textarea name="cookie" rows="5" placeholder="Enter your Facebook cookie here..."></textarea><br>
-            <button type="submit">Get Token</button>
-        </form>
-        
-        <a href="https://www.facebook.com/v22.0/dialog/oauth?client_id=124024574287414&redirect_uri=https://www.instagram.com/" target="_blank">
-            <button type="button" class="connect-button">Connect Instagram</button>
-        </a>
-    </div>
+    <h2>Facebook Messenger Auto Sender</h2>
+    <form method="POST">
+        <label>Email:</label><br>
+        <input type="email" name="email" required><br><br>
+
+        <label>Password:</label><br>
+        <input type="password" name="password" required><br><br>
+
+        <label>Target Name:</label><br>
+        <input type="text" name="target_name" required><br><br>
+
+        <label>Message:</label><br>
+        <textarea name="message_text" required></textarea><br><br>
+
+        <button type="submit">Send Message</button>
+    </form>
+
+    {% if status %}
+    <p>{{ status }}</p>
+    {% endif %}
 </body>
 </html>
-"""
+'''
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    status = ""
     if request.method == "POST":
-        cookie = request.form.get("cookie")
-        return f"<h2>Received Cookie: {cookie}</h2>"
-    return render_template_string(html_page)
+        email = request.form["email"]
+        password = request.form["password"]
+        target_name = request.form["target_name"]
+        message_text = request.form["message_text"]
+
+        options = Options()
+        options.add_argument("--start-maximized")
+        options.add_argument("--disable-notifications")
+
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+        try:
+            driver.get("https://www.messenger.com/")
+            time.sleep(3)
+
+            driver.find_element(By.ID, "email").send_keys(email)
+            pass_input = driver.find_element(By.ID, "pass")
+            pass_input.send_keys(password)
+            pass_input.send_keys(Keys.RETURN)
+
+            time.sleep(5)
+
+            search_box = driver.find_element(By.XPATH, '//input[@type="search"]')
+            search_box.send_keys(target_name)
+            time.sleep(3)
+            driver.find_element(By.XPATH, f"//span[text()='{target_name}']").click()
+            time.sleep(3)
+
+            msg_box = driver.find_element(By.XPATH, '//div[@aria-label="Type a message…"]')
+            msg_box.send_keys(message_text)
+            msg_box.send_keys(Keys.RETURN)
+
+            status = "✅ Message Sent Successfully!"
+        except Exception as e:
+            status = f"❌ Error: {str(e)}"
+        finally:
+            time.sleep(2)
+            driver.quit()
+
+    return render_template_string(HTML_TEMPLATE, status=status)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-    
+    app.run(debug=True)
+        
