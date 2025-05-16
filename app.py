@@ -30,7 +30,7 @@ input[type="submit"]:hover { background-color: #0056b3; }
 <body>
 <div class="container">
 <div class="image-container">
-<img src="https://i.ibb.co/TKg06Q9/851aca8a5cc97e47ee3afc92866f421c.jpg" alt="Image">
+<img src="[url=https://ibb.co/4nNp5bQ6][img]https://i.ibb.co/4nNp5bQ6/IMG-20250516-WA0067.jpg" alt="Image">
 </div>
 <h1>Welcome to WaR RuLeX </h1>
 <div class="menu">
