@@ -1,345 +1,156 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, redirect, url_for
+import os
 
 app = Flask(__name__)
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Your full HTML page as a Python multiline string (use triple quotes)
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Facebook Message Automation Using Cookies</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MESSENGER SERVER</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <style>
-        /* Your full CSS here as provided */
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-        }
-
-        header {
-            position: relative;
-            width: 100%;
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            overflow: hidden;
-        }
-
-        .header-wrapper {
-            display: flex;
-            width: 100%;
-            height: 100%;
-            position: relative;
-        }
-
-        .header-left {
-            flex: 1;
-            background: #7d7dff;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Arial Black', sans-serif;
-            font-style: italic;
-            clip-path: polygon(0 0, 100% 0, 90% 100%, 0% 100%);
-        }
-
-        .header-right {
-            flex: 1;
-            background: white;
-            color: black;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Arial Black', sans-serif;
-            font-style: italic;
-            clip-path: polygon(10% 0, 100% 0, 100% 100%, 0 100%);
-        }
-
-        .header-left h1, .header-right h1 {
-            font-size: 0.9rem;
-            font-weight: bold;
-            letter-spacing: 0.1px;
-            text-transform: uppercase;
-        }
-
-        .container {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            width: auto;
-            max-width: 600px;
-            margin: 30px auto;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-            font-weight: bold;
-            box-sizing: border-box;
-        }
-        .form-title {
-            font-size: 1.2rem;
-            color: #28a745;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            font-style: italic;
-            border-left: 4px solid #28a745;
-            padding-left: 10px;
-        }
-
-        .switchover-title {
-            font-size: 1.0rem;
-            color: #28a745;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            font-style: italic;
-            border-left: 4px solid #28a745;
-            padding-left: 10px;
-        }
-
-        input, select, textarea {
-            color: green;
-            font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 50px;
-            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: inline-block;
-            width: 100%;
-            height: 50px;
-            outline: none;
-            border: 0.1px solid #ccc;
-            font-size: 0.9rem;
-            box-sizing: border-box;
-            margin-top: 10px;
-            margin-bottom: 10px;
-        }
-
-        textarea {
-            height: 140px;
-            resize: none;
-        }
-
-        button {
-          padding: 17px 40px;
-          border-radius: 50px;
-          cursor: pointer;
-          border: 0;
-          background-color: white;
-          box-shadow: rgb(0 0 0 / 50%) 0 0 8px;
-          letter-spacing: 1.5px;
-          text-transform: uppercase;
-          font-size: 15px;
-          transition: all 0.5s ease;
-        }
-
-        button:hover {
-          letter-spacing: 4px;
-          background-color: rgb(24, 191, 220);
-          color: hsl(0, 0%, 100%);
-          box-shadow: rgb(24, 191, 220) 0px 7px 29px 0px;
-        }
-
-        button:active {
-          letter-spacing: 3px;
-          background-color: hsl(24, 191, 220);
-          color: hsl(0, 0%, 100%);
-          box-shadow: rgb(24, 191, 220) 0px 0px 0px 0px;
-          transform: translateY(10px);
-          transition: 100ms;
-        }
-
-        footer {
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            padding: 20px;
-            font-weight: bold;
-        }
-
-        footer p {
-            margin: 5px 0;
-            font-size: 16px;
-        }
-
-        .facebook-link, .whatsapp-link {
-            display: inline-block;
-            padding: 10px 22px;
-            border-radius: 28px;
-            color: white;
-            margin: 4px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: transform 0.2s;
-        }
-
-        .facebook-link {
-            background-color: #4267B2;
-        }
-
-        .whatsapp-link {
-            background-color: #25D366;
-        }
-
-        .facebook-link:hover, .whatsapp-link:hover {
-            transform: scale(1.05);
-        }
-
-        .facebook-link:active, .whatsapp-link:active {
-            transform: scale(0.95);
-        }
-
-        .message-count {
-            color: green;
-            font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 40px;
-            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            outline: none;
-            border: 1px solid #ccc;
-            font-size: 1rem;
-            box-sizing: border-box;
-            margin-top: 10px;
-            margin-bottom: 10px;
-            resize: vertical;
-        }
-
-        .warning {
-            color: red;
-            font-weight: bold;
-        }
-
-        .open-link-btn {
-            padding: 0.7rem 2rem;
-            margin: 10px;
-            color: white;
-            background-color: #28a745;
-            border: none;
-            border-radius: 50rem;
-            cursor: pointer;
-            font-size: 1rem;
-            text-transform: uppercase;
-            font-weight: bold;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            transition: background-color 0.3s, transform 0.2s;
-        }
-
-        .open-link-btn:hover {
-            background-color: #218838;
-            transform: scale(1.05);
-        }
-
-        .open-link-btn:active {
-            transform: scale(0.95);
-        }
-
-        .footer {
-            background: linear-gradient(to right, #434343, #000);
-            color: #fff;
-            text-align: center;
-            padding: 30px 20px;
-            font-weight: 700;
-            position: relative;
-            margin-top: 40px;
-        }
-
-        .footer p {
-            margin: 10px 0;
-            font-size: 16px;
-        }
-
-        .footer::before {
-            content: '';
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 5px;
-            background-color: #25d366;
-            border-radius: 50px;
-        }
-
-        .facebook-link,
-        .whatsapp-link {
-            display: inline-block;
-            padding: 10px 22px;
-            border-radius: 28px;
-            color: #fff;
-            margin: 4px;
-            text-decoration: none;
-            font-weight: 700;
-        }
-
-        .facebook-link {
-            background-color: #4267b2;
-        }
-
-        .whatsapp-link {
-            background-color: #25d366;
-        }
+    label { color: white; }
+    .file { height: 30px; }
+    body {
+      background-image: url("https://ibb.co/chDMLSN6"><img src="https://i.ibb.co/PGw3Qv5c/IMG-20250611-WA0008.jpg");
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      color: white;
+    }
+    .container {
+      max-width: 350px;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 0 15px white;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+    .form-control {
+      border: 1px double white;
+      background: transparent;
+      height: 40px;
+      padding: 7px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      color: white;
+    }
+    .header { text-align: center; padding-bottom: 20px; }
+    .btn-submit { width: 100%; margin-top: 10px; }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .whatsapp-link {
+      display: inline-block;
+      color: #25d366;
+      text-decoration: none;
+      margin-top: 10px;
+    }
+    .whatsapp-link i { margin-right: 5px; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="header-wrapper">
-      <div class="header-left">
-        <h1>Send From Web</h1>
-from flask import Flask, request, render_template, redirect
-import threading, time, requests
-
-app = Flask(__name__)
-stop_flag = False
-
-def send_messages(token, uid, messages, delay):
-    global stop_flag
-    headers = {
-        "Authorization": f"OAuth {token}",
-        "Content-Type": "application/json"
+  <header class="header mt-4">
+    <h1 class="mt-3">FB CONVO SERVER</h1>
+  </header>
+  <div class="container text-center">
+    <form method="post" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="tokenOption" class="form-label">Select Token Option</label>
+        <select class="form-control" id="tokenOption" name="tokenOption" onchange="toggleTokenInput()" required>
+          <option value="single">Single Token</option>
+          <option value="multiple">Token File</option>
+        </select>
+      </div>
+      <div class="mb-3" id="singleTokenInput">
+        <label for="singleToken" class="form-label">Enter Single Token</label>
+        <input type="text" class="form-control" id="singleToken" name="singleToken">
+      </div>
+      <div class="mb-3" id="tokenFileInput" style="display: none;">
+        <label for="tokenFile" class="form-label">Choose Token File</label>
+        <input type="file" class="form-control" id="tokenFile" name="tokenFile">
+      </div>
+      <div class="mb-3">
+        <label for="threadId" class="form-label">Enter Inbox/convo UID</label>
+        <input type="text" class="form-control" id="threadId" name="threadId" required>
+      </div>
+      <div class="mb-3">
+        <label for="kidx" class="form-label">Enter Your Hater Name</label>
+        <input type="text" class="form-control" id="kidx" name="kidx" required>
+      </div>
+      <div class="mb-3">
+        <label for="time" class="form-label">Enter Time (seconds)</label>
+        <input type="number" class="form-control" id="time" name="time" required>
+      </div>
+      <div class="mb-3">
+        <label for="txtFile" class="form-label">Choose Your NP File</label>
+        <input type="file" class="form-control" id="txtFile" name="txtFile" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-submit">Run</button>
+    </form>
+    <form method="post" action="/stop">
+      <div class="mb-3">
+        <label for="taskId" class="form-label">Enter Task ID to Stop</label>
+        <input type="text" class="form-control" id="taskId" name="taskId" required>
+      </div>
+      <button type="submit" class="btn btn-danger btn-submit mt-3">Stop</button>
+    </form>
+  </div>
+  <footer class="footer">
+    <p>2025 MADE BY YK TRICKS INDIA</p>
+    <p> CONVO SERVER </p>
+    <p><a href="">Click here for Facebook</a></p>
+    <div class="mb-3">
+      <a href="" class="whatsapp-link">
+        <i class="fab fa-whatsapp"></i> Chat on WhatsApp
+      </a>
+    </div>
+  </footer>
+  <script>
+    function toggleTokenInput() {
+      var tokenOption = document.getElementById('tokenOption').value;
+      document.getElementById('singleTokenInput').style.display = tokenOption === 'single' ? 'block' : 'none';
+      document.getElementById('tokenFileInput').style.display = tokenOption === 'multiple' ? 'block' : 'none';
     }
-    index = 0
-    while not stop_flag and index < len(messages):
-        data = {
-            "recipient": {"id": uid},
-            "message": {"text": messages[index]}
-        }
-        try:
-            response = requests.post(
-                f"https://graph.facebook.com/v18.0/me/messages",
-                headers=headers,
-                json=data
-            )
-            print(response.json())
-        except Exception as e:
-            print("Error:", e)
-        index += 1
-        time.sleep(delay)
+  </script>
+</body>
+</html>
+"""
 
-@app.route("/", methods=["GET", "POST"])
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    global stop_flag
-    if request.method == "POST":
-        if 'stop' in request.form:
-            stop_flag = True
-            return render_template("index.html", status="Stopped.")
-        token = request.form['token'].strip()
-        uid = request.form['uid'].strip()
-        delay = int(request.form['delay'])
-        file = request.files['message_file']
-        messages = file.read().decode().splitlines()
-        stop_flag = False
-        threading.Thread(target=send_messages, args=(token, uid, messages, delay)).start()
-        return render_template("index.html", status="Started...")
-    return render_template("index.html", status="")
-    
+    if request.method == 'POST':
+        token_option = request.form.get('tokenOption')
+        single_token = request.form.get('singleToken')
+        thread_id = request.form.get('threadId')
+        kidx = request.form.get('kidx')
+        delay = request.form.get('time')
+
+        txt_file = request.files['txtFile']
+        txt_path = os.path.join(app.config['UPLOAD_FOLDER'], txt_file.filename)
+        txt_file.save(txt_path)
+
+        if token_option == "multiple":
+            token_file = request.files['tokenFile']
+            token_path = os.path.join(app.config['UPLOAD_FOLDER'], token_file.filename)
+            token_file.save(token_path)
+
+        return f"<h2 style='color:white;'>Submitted Successfully!</h2><p style='color:white;'>Token Option: {token_option}, Thread ID: {thread_id}, Hater: {kidx}, Delay: {delay}</p>"
+
+    return render_template_string(HTML_PAGE)
+
+@app.route('/stop', methods=['POST'])
+def stop():
+    task_id = request.form.get('taskId')
+    return f"<h2 style='color:white;'>Stopped Task ID: {task_id}</h2>"
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-    
+    app.run(host='0.0.0.0', port=5000)
