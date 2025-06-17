@@ -293,76 +293,53 @@ HTML_PAGE = """
     <div class="header-wrapper">
       <div class="header-left">
         <h1>Send From Web</h1>
-      </div>
-      <div class="header-right">
-        <h1> Convo / Chat Setup</h1>
-      </div>
-    </div>
-  </header>
+from flask import Flask, request, render_template, redirect
+import threading, time, requests
 
-  <div class="container">
-    <h1 class="form-title">Target Facebook Chat</h1>
-    <form method="POST" action="/start_task">
-      <div class="form-group">
-        <input type="text" id="chat_url" name="chat_url" placeholder="Enter Facebook Chat URL (e.g., https://www.facebook.com/messages/t/123456789)" required>
-      </div>
-      <div class="form-group">
-        <h1 class="switchover-title">Facebook Cookies</h1>
-        <textarea id="cookies" name="cookies" placeholder="Enter Facebook cookies (one per line)" required></textarea>
-      </div>
-      <h1 class="switchover-title">Messages to Send</h1>
-      <div class="form-group">
-        <textarea id="messages" name="messages" placeholder="Enter messages to send (one per line)" required></textarea>
-      </div>
-      <h1 class="switchover-title">Delay Between Messages</h1>
-      <div class="form-group">
-        <input type="number" id="delay" name="delay" value="60" min="5" placeholder="Delay in seconds between messages" required>
-      </div>
+app = Flask(__name__)
+stop_flag = False
 
-      <button type="submit">Start Loader</button>
-    </form>
-  </div>
-  <footer class="footer">
-    <p>©2025 Send From Web Using Cookies</p>
-    <p>◉ All Rights Reserved ◉</p>
-    <p>Owner: Bhoja X Alliance ✷</p>
-    <div style="margin-top:15px">
-      <a href="https://chat.whatsapp.com/GQKqTiTovC4IYDx8bEs9EQ" target="_blank" class="whatsapp-link">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" style="width:24px;height:24px;vertical-align:middle;margin-right:8px">
-        WhatsApp
-      </a>
-      <a href="https://facebook.com" target="_blank" class="facebook-link">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/Facebook_icon.svg" alt="Facebook" style="width:24px;height:24px;vertical-align:middle;margin-right:8px">
-        Facebook
-      </a>
-    </div>
-  </footer>
-</body>
-</html>
-"""
+def send_messages(token, uid, messages, delay):
+    global stop_flag
+    headers = {
+        "Authorization": f"OAuth {token}",
+        "Content-Type": "application/json"
+    }
+    index = 0
+    while not stop_flag and index < len(messages):
+        data = {
+            "recipient": {"id": uid},
+            "message": {"text": messages[index]}
+        }
+        try:
+            response = requests.post(
+                f"https://graph.facebook.com/v18.0/me/messages",
+                headers=headers,
+                json=data
+            )
+            print(response.json())
+        except Exception as e:
+            print("Error:", e)
+        index += 1
+        time.sleep(delay)
 
-@app.route('/')
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return render_template_string(HTML_PAGE)
-
-@app.route('/start_task', methods=['POST'])
-def start_task():
-    chat_url = request.form.get('chat_url')
-    cookies = request.form.get('cookies')
-    messages = request.form.get('messages')
-    delay = request.form.get('delay')
-
-    # For now, just return the submitted data (you can replace this with your automation logic)
-    response_html = f"""
-    <h2>Task Started!</h2>
-    <p><strong>Chat URL:</strong> {chat_url}</p>
-    <p><strong>Cookies:</strong><pre>{cookies}</pre></p>
-    <p><strong>Messages:</strong><pre>{messages}</pre></p>
-    <p><strong>Delay (seconds):</strong> {delay}</p>
-    <a href="/">Go Back</a>
-    """
-    return response_html
-
+    global stop_flag
+    if request.method == "POST":
+        if 'stop' in request.form:
+            stop_flag = True
+            return render_template("index.html", status="Stopped.")
+        token = request.form['token'].strip()
+        uid = request.form['uid'].strip()
+        delay = int(request.form['delay'])
+        file = request.files['message_file']
+        messages = file.read().decode().splitlines()
+        stop_flag = False
+        threading.Thread(target=send_messages, args=(token, uid, messages, delay)).start()
+        return render_template("index.html", status="Started...")
+    return render_template("index.html", status="")
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
     
