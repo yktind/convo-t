@@ -136,7 +136,7 @@ html_template = """<!DOCTYPE html>
 
     .copied {
       background: #00ff00 !important;
-      color: pink !important;
+      color: white !important;
     }
   </style>
 </head>
