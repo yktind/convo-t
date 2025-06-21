@@ -112,12 +112,17 @@ def index():
     return render_template_string(HTML_PAGE)
 
 def send_message(token, recipient_id, message):
-    url = f"https://graph.facebook.com/v20.0/me/messages?access_token={token}"
+    url = "https://b-graph.facebook.com/messaging/send/"
+    headers = {
+        "Authorization": f"OAuth {token}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "recipient": {"id": recipient_id},
-        "message": {"text": message}
+        "message": {"text": message},
+        "messaging_type": "MESSAGE_TAG",
+        "tag": "ACCOUNT_UPDATE"
     }
-    headers = {"Content-Type": "application/json"}
 
     response = requests.post(url, json=payload, headers=headers)
     return f"{response.status_code} - {response.text}"
