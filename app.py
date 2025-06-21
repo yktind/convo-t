@@ -94,7 +94,7 @@ def send_graphql_message(token, recipient_id, message):
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Facebook Android",
         "X-FB-Friendly-Name": "MessengerGraphQLSendMessageMutation",
-        "X-FB-Connection-Type": "mobile.LTE",
+        "X-FB-Connection-Type": "mobile.LTE"
     }
 
     message_id = str(uuid.uuid4())
@@ -114,7 +114,7 @@ def send_graphql_message(token, recipient_id, message):
         "fb_api_caller_class": "RelayModern",
         "fb_api_req_friendly_name": "MessengerGraphQLSendMessageMutation",
         "variables": json.dumps(variables),
-        "doc_id": "5301538573184946"
+        "doc_id": "7714890518579626"
     }
 
     try:
