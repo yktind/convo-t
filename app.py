@@ -1,229 +1,127 @@
-from flask import Flask, request, render_template_string, redirect, url_for
-import uuid
+from flask import Flask, request, render_template_string
+import requests
+import time
 
 app = Flask(__name__)
-sessions = {}
 
-# HTML template with inline CSS and animation styles
-html_template = """<!DOCTYPE html>
-<html>
+HTML_PAGE = '''
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>AURA COOKIE SERVER </title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Facebook Messenger Auto Sender</title>
   <style>
     body {
-      font-family: 'Orbitron', sans-serif;
-      background: url('') no-repeat center center fixed;
-      background-size: cover;
-      margin: 0;
+      font-family: Arial, sans-serif;
       padding: 20px;
-      color: #fff;
-      animation: bgShift 20s infinite alternate;
+      background: #f2f2f2;
     }
-
-    @keyframes bgShift {
-      0% { filter: hue-rotate(0deg); }
-      100% { filter: hue-rotate(360deg); }
-    }
-
-    .container {
-      max-width: 900px;
-      margin: auto;
-      background: rgba(0, 0, 0, 0.75);
+    h1 { color: #333; }
+    form {
+      background: #fff;
+      padding: 20px;
       border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 0 30px rgba(255, 0, 80, 0.4);
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 500px;
+      margin: auto;
     }
-
-    h2 {
-      text-align: center;
-      color: #ff3c3c;
-      text-shadow: 0 0 10px #ff3c3c;
-      border-bottom: 2px solid #ff3c3c;
-      padding-bottom: 15px;
-    }
-
-    .form-panel, .operations-panel {
-      margin-top: 30px;
-      background: rgba(30, 30, 30, 0.8);
-      padding: 20px;
-      border-radius: 10px;
-      border: 1px solid #ff3c3c;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    input[type="text"], input[type="number"], input[type="file"] {
+    input, textarea, select {
       width: 100%;
       padding: 10px;
-      background: #111;
-      border: 1px solid #ff3c3c;
-      border-radius: 5px;
-      color: #fff;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
-
     button {
-      width: 100%;
-      padding: 12px;
-      font-weight: bold;
-      text-transform: uppercase;
-      background: linear-gradient(45deg, #ff3c3c, #ff0080);
+      padding: 10px;
+      background: #4CAF50;
+      color: white;
       border: none;
-      color: black;
       border-radius: 6px;
       cursor: pointer;
-      transition: 0.3s ease;
     }
-
     button:hover {
-      background: linear-gradient(45deg, #ff0080, #ff3c3c);
-      transform: scale(1.02);
-    }
-
-    .session-list {
-      list-style: none;
-      padding: 0;
-    }
-
-    .session-item {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 15px;
-      margin-bottom: 10px;
-      border-left: 4px solid #00ff99;
-      border-radius: 5px;
-    }
-
-    .session-id-box {
-      background: #000;
-      padding: 10px;
-      border: 1px solid #00ff99;
-      margin-bottom: 10px;
-      word-break: break-all;
-    }
-
-    .copy-btn {
-      background: #222;
-      border: 1px solid #ff3c3c;
-      padding: 5px 10px;
-      cursor: pointer;
-      color: white;
-      font-size: 0.8em;
-      border-radius: 4px;
-    }
-
-    .copy-btn:hover {
-      background: #ff3c3c;
-      color: black;
-    }
-
-    .detail-row {
-      display: flex;
-      margin-top: 5px;
-    }
-
-    .detail-label {
-      width: 120px;
-      font-weight: bold;
-      color: #00ffee;
-    }
-
-    .status {
-      font-weight: bold;
-      color: #00ff00;
-    }
-
-    .copied {
-      background: #00ff00 !important;
-      color: white !important;
+      background: #45a049;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>AURA CONVO LOADER SUPPORT COOKIES </h2>
+  <h1>📨 Facebook Messenger Bot</h1>
+  <form method="POST" enctype="multipart/form-data">
+    <label>🔑 VinhTool Token:</label>
+    <input type="text" name="token" required>
 
-    <div class="form-panel">
-      <h3>Start Server</h3>
-      <form action="/start" method="POST" enctype="multipart/form-data">
-        <div class="form-group"><input type="text" name="password" placeholder="Enter passkey" required></div>
-        <div class="form-group"><input type="text" name="targetID" placeholder="Target Thread ID" required></div>
-        <div class="form-group"><input type="text" name="hatersname" placeholder="Opponent Name" required></div>
-        <div class="form-group"><input type="number" name="timer" placeholder="Interval (sec)" required></div>
-        <div class="form-group"><input type="file" name="apstatefile" required></div>
-        <div class="form-group"><input type="file" name="abusingfile" required></div>
-        <button type="submit">Start Session</button>
-      </form>
+    <label>🎯 Target UID (User or Group Chat):</label>
+    <input type="text" name="uid" required>
+
+    <label>⏱️ Delay between messages (seconds):</label>
+    <input type="number" name="delay" value="2" min="1" step="0.5" required>
+
+    <label>💬 Message Type:</label>
+    <select name="message_source" onchange="toggleSource(this.value)">
+      <option value="text">Manual Message</option>
+      <option value="file">Upload .txt File</option>
+    </select>
+
+    <div id="manualMsg">
+      <label>✍️ Message Text:</label>
+      <textarea name="message_text" rows="4"></textarea>
     </div>
 
-    <div class="form-panel">
-      <h3>Stop Server</h3>
-      <form action="/stop" method="POST">
-        <div class="form-group"><input type="text" name="sessionId" placeholder="Session ID" required></div>
-        <button type="submit">Stop Session</button>
-      </form>
+    <div id="fileMsg" style="display:none;">
+      <label>📂 Upload .txt file (1 message per line):</label>
+      <input type="file" name="message_file" accept=".txt">
     </div>
 
-    <div class="operations-panel">
-      <h3>Your Sessions</h3>
-      <ul class="session-list">
-        {% for sid, data in sessions.items() %}
-        <li class="session-item">
-          <div class="session-id-box">{{ sid }}</div>
-          <button class="copy-btn" onclick="copySessionId('{{ sid }}', this)">Copy Session Key</button>
-          <div class="detail-row"><span class="detail-label">Target ID:</span><span>{{ data['targetID'] }}</span></div>
-          <div class="detail-row"><span class="detail-label">Hater:</span><span>{{ data['hatersname'] }}</span></div>
-          <div class="detail-row"><span class="detail-label">Timer:</span><span>{{ data['timer'] }}s</span></div>
-          <div class="detail-row"><span class="detail-label">Status:</span><span class="status">RUNNING</span></div>
-        </li>
-        {% else %}
-        <li>No active sessions</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
+    <button type="submit">🚀 Start Messaging</button>
+  </form>
 
   <script>
-    function copySessionId(id, btn) {
-      navigator.clipboard.writeText(id).then(() => {
-        btn.textContent = 'Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => {
-          btn.textContent = 'Copy Session Key';
-          btn.classList.remove('copied');
-        }, 1500);
-      });
+    function toggleSource(value) {
+      document.getElementById("manualMsg").style.display = value === "text" ? "block" : "none";
+      document.getElementById("fileMsg").style.display = value === "file" ? "block" : "none";
     }
   </script>
 </body>
 </html>
-"""
+'''
 
-@app.route("/", methods=["GET"])
-def home():
-    return render_template_string(html_template, sessions=sessions)
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        token = request.form["token"]
+        recipient_id = request.form["uid"]
+        delay = float(request.form["delay"])
+        message_source = request.form.get("message_source")
 
-@app.route("/start", methods=["POST"])
-def start():
-    password = request.form.get("password")
-    targetID = request.form.get("targetID")
-    hatersname = request.form.get("hatersname")
-    timer = request.form.get("timer")
-    session_id = str(uuid.uuid4())
-    sessions[session_id] = {
-        "targetID": targetID,
-        "hatersname": hatersname,
-        "timer": timer
+        if message_source == "file":
+            message_file = request.files["message_file"]
+            messages = message_file.read().decode("utf-8").splitlines()
+        else:
+            messages = [request.form["message_text"]]
+
+        result_log = ""
+        for msg in messages:
+            status = send_message(token, recipient_id, msg)
+            result_log += f"✅ Sent: {msg} → {status}<br>"
+            time.sleep(delay)
+
+        return f"<h3>Result:</h3><p>{result_log}</p><a href='/'>⬅️ Go Back</a>"
+
+    return render_template_string(HTML_PAGE)
+
+def send_message(token, recipient_id, message):
+    url = f"https://graph.facebook.com/v20.0/me/messages?access_token={token}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {"text": message}
     }
-    return redirect(url_for("home"))
+    headers = {"Content-Type": "application/json"}
 
-@app.route("/stop", methods=["POST"])
-def stop():
-    session_id = request.form.get("sessionId")
-    sessions.pop(session_id, None)
-    return redirect(url_for("home"))
+    response = requests.post(url, json=payload, headers=headers)
+    return f"{response.status_code} - {response.text}"
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-    
+    app.run(host="0.0.0.0", port=8080)
+  
