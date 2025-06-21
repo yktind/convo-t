@@ -1,3 +1,4 @@
+
 from flask import Flask, request, render_template_string
 import requests
 import time
@@ -6,11 +7,11 @@ import uuid
 
 app = Flask(__name__)
 
-HTML_PAGE = '''
+HTML_PAGE = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang='en'>
 <head>
-  <meta charset="UTF-8">
+  <meta charset='UTF-8'>
   <title>Messenger GraphQL Auto Sender</title>
   <style>
     body { font-family: Arial; padding: 20px; background: #f0f0f0; }
@@ -22,33 +23,33 @@ HTML_PAGE = '''
 </head>
 <body>
   <h2>📨 Messenger Auto Bot (GraphQL)</h2>
-  <form method="POST" enctype="multipart/form-data">
+  <form method='POST' enctype='multipart/form-data'>
     <label>🔑 VinhTool Token:</label>
-    <input type="text" name="token" required>
+    <input type='text' name='token' required>
 
     <label>🎯 Target UID:</label>
-    <input type="text" name="uid" required>
+    <input type='text' name='uid' required>
 
     <label>⏱️ Delay (seconds):</label>
-    <input type="number" name="delay" value="2" step="0.5">
+    <input type='number' name='delay' value='2' step='0.5'>
 
     <label>💬 Message Type:</label>
-    <select name="message_source" onchange="toggleSource(this.value)">
-      <option value="text">Manual Message</option>
-      <option value="file">Upload .txt File</option>
+    <select name='message_source' onchange='toggleSource(this.value)'>
+      <option value='text'>Manual Message</option>
+      <option value='file'>Upload .txt File</option>
     </select>
 
-    <div id="manualMsg">
+    <div id='manualMsg'>
       <label>✍️ Message Text:</label>
-      <textarea name="message_text" rows="4"></textarea>
+      <textarea name='message_text' rows='4'></textarea>
     </div>
 
-    <div id="fileMsg" style="display:none;">
+    <div id='fileMsg' style='display:none;'>
       <label>📁 Upload .txt (1 message per line):</label>
-      <input type="file" name="message_file" accept=".txt">
+      <input type='file' name='message_file' accept='.txt'>
     </div>
 
-    <button type="submit">🚀 Start Sending</button>
+    <button type='submit'>🚀 Start Sending</button>
   </form>
 
   <script>
@@ -59,7 +60,7 @@ HTML_PAGE = '''
   </script>
 </body>
 </html>
-'''
+"""
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -92,25 +93,27 @@ def send_graphql_message(token, recipient_id, message):
         "Authorization": f"OAuth {token}",
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": "Facebook Android",
-        "Accept-Encoding": "gzip, deflate",
-        "Connection": "Keep-Alive",
         "X-FB-Friendly-Name": "MessengerGraphQLSendMessageMutation",
         "X-FB-Connection-Type": "mobile.LTE",
     }
 
     message_id = str(uuid.uuid4())
+    variables = {
+        "id": recipient_id,
+        "message": message,
+        "client_mutation_id": message_id,
+        "actor_id": recipient_id,
+        "messaging_tag": "ACCOUNT_UPDATE",
+        "message_type": "MESSAGE_TAG"
+    }
+
     form_data = {
         "av": recipient_id,
         "__user": recipient_id,
         "__a": "1",
         "fb_api_caller_class": "RelayModern",
         "fb_api_req_friendly_name": "MessengerGraphQLSendMessageMutation",
-        "variables": json.dumps({
-            "id": recipient_id,
-            "message": message,
-            "client_mutation_id": message_id,
-            "actor_id": recipient_id
-        }),
+        "variables": json.dumps(variables),
         "doc_id": "5301538573184946"
     }
 
@@ -122,3 +125,4 @@ def send_graphql_message(token, recipient_id, message):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
+  
