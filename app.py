@@ -13,7 +13,7 @@ html_template = """<!DOCTYPE html>
   <style>
     body {
       font-family: 'Orbitron', sans-serif;
-      background: url('https://images.unsplash.com/photo-1509228627159-6452f2f56f91?auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
+      background: url('') no-repeat center center fixed;
       background-size: cover;
       margin: 0;
       padding: 20px;
@@ -71,7 +71,7 @@ html_template = """<!DOCTYPE html>
       text-transform: uppercase;
       background: linear-gradient(45deg, #ff3c3c, #ff0080);
       border: none;
-      color: white;
+      color: black;
       border-radius: 6px;
       cursor: pointer;
       transition: 0.3s ease;
