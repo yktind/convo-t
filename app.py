@@ -2,7 +2,6 @@
 from flask import Flask, request, render_template_string
 import requests
 import time
-import re
 
 app = Flask(__name__)
 
@@ -11,7 +10,7 @@ HTML_PAGE = """
 <html lang='en'>
 <head>
   <meta charset='UTF-8'>
-  <title>Messenger Bot (via Cookie)</title>
+  <title>Messenger Bot (Manual fb_dtsg)</title>
   <style>
     body { font-family: Arial; padding: 20px; background: #f4f4f4; }
     form { background: white; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
@@ -21,10 +20,13 @@ HTML_PAGE = """
   </style>
 </head>
 <body>
-  <h2>ðŸª Messenger Bot - Cookie Based</h2>
+  <h2>ðŸª Messenger Bot - Manual fb_dtsg</h2>
   <form method='POST'>
     <label>ðŸª Facebook Cookie:</label>
     <textarea name='cookie' rows='4' required></textarea>
+
+    <label>ðŸ” fb_dtsg Token:</label>
+    <input type='text' name='fb_dtsg' required>
 
     <label>ðŸŽ¯ Target UID:</label>
     <input type='text' name='uid' required>
@@ -45,21 +47,19 @@ HTML_PAGE = """
 def index():
     if request.method == "POST":
         cookie = request.form["cookie"]
+        fb_dtsg = request.form["fb_dtsg"]
         uid = request.form["uid"]
         message = request.form["message"]
         delay = float(request.form["delay"])
-        result = send_message_with_cookie(cookie, uid, message)
+        result = send_message(cookie, fb_dtsg, uid, message)
         time.sleep(delay)
         return f"<h3>âœ… Result:</h3><p>{result}</p><a href='/'>â¬…ï¸ Go Back</a>"
     return render_template_string(HTML_PAGE)
 
-def send_message_with_cookie(cookie_str, target_id, message_text):
+def send_message(cookie_str, fb_dtsg, target_id, message_text):
     try:
         cookies = {c.split("=")[0].strip(): c.split("=")[1] for c in cookie_str.split(";") if "=" in c}
         c_user = cookies.get("c_user")
-        fb_dtsg = get_fb_dtsg(cookies)
-        if not fb_dtsg:
-            return "âŒ Failed to extract fb_dtsg token."
 
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -85,14 +85,6 @@ def send_message_with_cookie(cookie_str, target_id, message_text):
 
     except Exception as e:
         return f"âŒ Exception: {str(e)}"
-
-def get_fb_dtsg(cookies):
-    try:
-        res = requests.get("https://www.facebook.com", cookies=cookies)
-        match = re.search(r'name="fb_dtsg" value="(.*?)"', res.text)
-        return match.group(1) if match else None
-    except:
-        return None
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
