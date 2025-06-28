@@ -1,102 +1,152 @@
+
 from flask import Flask, request, redirect, Response
-import threading
-import requests
-import time
-import random
-from bs4 import BeautifulSoup
+import threading, time, random, requests, json
 
 app = Flask(__name__)
 
-# Variables
-app_cookie = ""
-app_uid = ""
-app_delay = 10
-app_messages = []
-app_running = False
-app_stop = False
-app_thread = None
+is_running = False
+stop_flag = False
+thread = None
 
-HTML = '''<html>
-<head><title>FB Bot</title></head>
+fb_cookie = ""
+target_uid = ""
+delay_seconds = 5
+messages = []
+
+HTML_PAGE = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FB Messenger Auto Sender</title>
+  <style>
+    body {
+      background: #0f2027;
+      background: linear-gradient(to right, #2c5364, #203a43, #0f2027);
+      color: white;
+      font-family: Arial, sans-serif;
+      padding: 40px;
+    }
+    form {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 15px;
+    }
+    input, button {
+      padding: 10px;
+      width: 100%;
+      margin: 10px 0;
+      border-radius: 10px;
+      border: none;
+    }
+    button {
+      background: linear-gradient(to right, #00c6ff, #0072ff);
+      color: white;
+      font-weight: bold;
+      transition: 0.3s ease;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background: linear-gradient(to right, #0072ff, #00c6ff);
+    }
+    .stop-btn {
+      background: crimson;
+      color: white;
+    }
+  </style>
+</head>
 <body>
-<h2>Facebook Bot</h2>
-<form method="POST" enctype="multipart/form-data">
-  Cookie:<br><input type="text" name="cookie"><br>
-  UID:<br><input type="text" name="uid"><br>
-  Delay:<br><input type="number" name="delay" value="5"><br>
-  .txt File:<br><input type="file" name="message_file"><br>
-  <button type="submit">Start</button>
-</form>
-<form action="/stop"><button>Stop</button></form>
+  <h2>ðŸ“¨ Facebook Messenger Auto Sender (Web Cookie)</h2>
+  <form method="POST" enctype="multipart/form-data">
+    <label>ðŸª Facebook Cookie:</label>
+    <input type="text" name="cookie" required>
+
+    <label>ðŸŽ¯ Target Thread ID (Group or Inbox):</label>
+    <input type="text" name="uid" required>
+
+    <label>ðŸ“„ Upload .txt Message File:</label>
+    <input type="file" name="message_file" accept=".txt" required>
+
+    <label>â±ï¸ Delay (in seconds):</label>
+    <input type="number" name="delay" value="5" min="1">
+
+    <button type="submit">ðŸš€ Start Sending</button>
+  </form>
+
+  <form action="/stop">
+    <button class="stop-btn">ðŸ›‘ Stop</button>
+  </form>
 </body>
-</html>'''
+</html>
+'''
 
-def get_token(cook):
+def send_graphql_message(cookie, thread_id, message):
     try:
-        r = requests.get("https://mbasic.facebook.com/messages", headers={
-            "Cookie": cook,
-            "User-Agent": "Mozilla/5.0"
-        })
-        soup = BeautifulSoup(r.text, "html.parser")
-        return soup.find("input", {"name": "fb_dtsg"}).get("value")
-    except:
-        return None
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0",
+            "Cookie": cookie,
+        }
 
-def send_msg(cook, uid, msg, token):
-    try:
-        url = f"https://mbasic.facebook.com/messages/thread/{uid}"
-        s = requests.Session()
-        h = {"Cookie": cook, "User-Agent": "Mozilla/5.0"}
-        res = s.get(url, headers=h)
-        soup = BeautifulSoup(res.text, "html.parser")
-        form = soup.find("form")
-        if not form: return
-        action = form["action"]
-        inputs = form.find_all("input")
-        data = {i.get("name"): i.get("value", "") for i in inputs if i.get("name")}
-        data["body"] = msg
-        s.post("https://mbasic.facebook.com" + action, headers=h, data=data)
-        print("✅", msg)
+        data = {
+            "av": thread_id,
+            "__user": thread_id,
+            "__a": 1,
+            "variables": json.dumps({
+                "id": thread_id,
+                "message": {"text": message},
+                "client_mutation_id": "1"
+            }),
+            "doc_id": "5513683505370136"
+        }
+
+        response = requests.post(
+            "https://www.facebook.com/api/graphql/",
+            headers=headers,
+            data=data
+        )
+
+        if response.status_code == 200:
+            print("âœ… Sent:", message)
+        else:
+            print("âŒ Error:", response.text[:200])
+
     except Exception as e:
-        print("❌", e)
+        print("âŒ Exception:", e)
 
-def run_bot():
-    global app_cookie, app_uid, app_delay, app_messages, app_stop, app_running
-    token = get_token(app_cookie)
-    if not token:
-        print("❌ Invalid cookie")
-        app_running = False
-        return
-    while not app_stop:
-        m = random.choice(app_messages)
-        send_msg(app_cookie, app_uid, m, token)
-        time.sleep(app_delay)
-    app_running = False
+def message_thread():
+    global fb_cookie, target_uid, delay_seconds, messages, is_running, stop_flag
+    while not stop_flag:
+        msg = random.choice(messages)
+        send_graphql_message(fb_cookie, target_uid, msg)
+        time.sleep(delay_seconds)
+    is_running = False
 
 @app.route("/", methods=["GET", "POST"])
-def main():
-    global app_cookie, app_uid, app_delay, app_messages, app_stop, app_running, app_thread
+def index():
+    global fb_cookie, target_uid, delay_seconds, messages, is_running, stop_flag, thread
+
     if request.method == "POST":
-        app_cookie = request.form["cookie"]
-        app_uid = request.form["uid"]
-        app_delay = int(request.form["delay"])
+        fb_cookie = request.form.get("cookie")
+        target_uid = request.form.get("uid")
+        delay_seconds = int(request.form.get("delay", "5"))
         file = request.files["message_file"]
-        app_messages = [line.strip() for line in file.read().decode().splitlines() if line.strip()]
-        if not app_running:
-            app_stop = False
-            app_thread = threading.Thread(target=run_bot)
-            app_thread.start()
-            app_running = True
+        messages = [line.strip() for line in file.read().decode("utf-8").splitlines() if line.strip()]
+
+        if not is_running:
+            stop_flag = False
+            thread = threading.Thread(target=message_thread)
+            thread.start()
+            is_running = True
+
         return redirect("/")
-    return Response(HTML, mimetype='text/html')
+    return Response(HTML_PAGE, mimetype='text/html')
 
 @app.route("/stop")
 def stop():
-    global app_stop, app_running
-    app_stop = True
-    app_running = False
+    global stop_flag, is_running
+    stop_flag = True
+    is_running = False
     return redirect("/")
 
 if __name__ == "__main__":
     app.run(port=5000)
-      
