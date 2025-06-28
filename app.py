@@ -1,5 +1,4 @@
-
-from flask import Flask, request, render_template_string, redirect
+from flask import Flask, request, redirect, Response
 import threading, time, random, requests
 from bs4 import BeautifulSoup
 
@@ -15,7 +14,7 @@ config = {
     "messages": []
 }
 
-HTML_PAGE = """
+HTML_PAGE = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -80,7 +79,7 @@ HTML_PAGE = """
   </form>
 </body>
 </html>
-"""
+'''
 
 def get_fb_dtsg(cookie):
     try:
@@ -158,7 +157,7 @@ def index():
 
         return redirect("/")
 
-    return render_template_string(HTML_PAGE, is_running=is_running)
+    return Response(HTML_PAGE, mimetype='text/html')
 
 @app.route("/stop")
 def stop():
@@ -169,4 +168,3 @@ def stop():
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
-        
