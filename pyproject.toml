@@ -14,7 +14,6 @@ pycryptodome = "^3.19"
 fbchat = "^1.9.7"
 pillow = "^9.5.0"
 instagrapi = "^2.0.0"
-beautifulsoup4 = "^4.12.2"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
