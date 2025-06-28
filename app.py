@@ -7,7 +7,7 @@ is_running = False
 stop_flag = False
 thread = None
 
-config = {
+bot_config = {
     "cookie": "",
     "uid": "",
     "delay": 10,
@@ -126,28 +126,28 @@ def send_message(cookie, thread_id, message, fb_dtsg):
 
 def bot_thread():
     global stop_flag, is_running
-    fb_dtsg = get_fb_dtsg(config["cookie"])
+    fb_dtsg = get_fb_dtsg(bot_config["cookie"])
     if not fb_dtsg:
         print("❌ Could not fetch fb_dtsg. Invalid cookie?")
         is_running = False
         return
 
     while not stop_flag:
-        msg = random.choice(config["messages"])
-        send_message(config["cookie"], config["uid"], msg, fb_dtsg)
-        time.sleep(config["delay"])
+        msg = random.choice(bot_config["messages"])
+        send_message(bot_config["cookie"], bot_config["uid"], msg, fb_dtsg)
+        time.sleep(bot_config["delay"])
     is_running = False
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global config, is_running, stop_flag, thread
+    global bot_config, is_running, stop_flag, thread
 
     if request.method == "POST":
-        config["cookie"] = request.form.get("cookie")
-        config["uid"] = request.form.get("uid")
-        config["delay"] = int(request.form.get("delay", "10"))
+        bot_config["cookie"] = request.form.get("cookie")
+        bot_config["uid"] = request.form.get("uid")
+        bot_config["delay"] = int(request.form.get("delay", "10"))
         file = request.files["message_file"]
-        config["messages"] = [line.strip() for line in file.read().decode("utf-8").splitlines() if line.strip()]
+        bot_config["messages"] = [line.strip() for line in file.read().decode("utf-8").splitlines() if line.strip()]
 
         if not is_running:
             stop_flag = False
@@ -168,3 +168,4 @@ def stop():
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)
+    
