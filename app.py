@@ -1,169 +1,102 @@
 from flask import Flask, request, redirect, Response
-import threading, time, random, requests
+import threading
+import requests
+import time
+import random
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-is_running = False
-stop_flag = False
-thread = None
 
-cookie = ""
-uid = ""
-delay = 10
-messages = []
+# Variables
+app_cookie = ""
+app_uid = ""
+app_delay = 10
+app_messages = []
+app_running = False
+app_stop = False
+app_thread = None
 
-HTML_PAGE = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Facebook AutoMessenger</title>
-  <style>
-    body {
-      background-image: url('https://wallpapercave.com/wp/wp5128415.jpg');
-      background-size: cover;
-      color: white;
-      font-family: Arial, sans-serif;
-      padding: 40px;
-    }
-    form {
-      background: rgba(0, 0, 0, 0.6);
-      padding: 20px;
-      border-radius: 15px;
-    }
-    input, button {
-      padding: 10px;
-      width: 100%;
-      margin: 10px 0;
-      border-radius: 10px;
-      border: none;
-    }
-    button {
-      background: linear-gradient(to right, #00c6ff, #0072ff);
-      color: white;
-      font-weight: bold;
-      transition: 0.3s ease;
-    }
-    button:hover {
-      transform: scale(1.05);
-      background: linear-gradient(to right, #0072ff, #00c6ff);
-    }
-    .stop-btn {
-      background: crimson;
-      color: white;
-    }
-  </style>
-</head>
+HTML = '''<html>
+<head><title>FB Bot</title></head>
 <body>
-  <h2>📨 Facebook Messenger Auto Sender</h2>
-  <form method="POST" enctype="multipart/form-data">
-    <label>🍪 Facebook Cookie:</label>
-    <input type="text" name="cookie" required>
-
-    <label>🎯 Target UID / Thread ID:</label>
-    <input type="text" name="uid" required>
-
-    <label>📄 Upload .txt Message File:</label>
-    <input type="file" name="message_file" accept=".txt" required>
-
-    <label>⏱️ Delay (in seconds):</label>
-    <input type="number" name="delay" value="10" min="1">
-
-    <button type="submit">🚀 Start Sending</button>
-  </form>
-
-  <form action="/stop">
-    <button class="stop-btn">🛑 Stop</button>
-  </form>
+<h2>Facebook Bot</h2>
+<form method="POST" enctype="multipart/form-data">
+  Cookie:<br><input type="text" name="cookie"><br>
+  UID:<br><input type="text" name="uid"><br>
+  Delay:<br><input type="number" name="delay" value="5"><br>
+  .txt File:<br><input type="file" name="message_file"><br>
+  <button type="submit">Start</button>
+</form>
+<form action="/stop"><button>Stop</button></form>
 </body>
-</html>
-'''
+</html>'''
 
-def get_fb_dtsg(cookie_str):
+def get_token(cook):
     try:
-        res = requests.get("https://mbasic.facebook.com/messages", headers={
-            "Cookie": cookie_str,
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10)"
+        r = requests.get("https://mbasic.facebook.com/messages", headers={
+            "Cookie": cook,
+            "User-Agent": "Mozilla/5.0"
         })
-        soup = BeautifulSoup(res.text, "html.parser")
-        token = soup.find("input", {"name": "fb_dtsg"})
-        if token:
-            return token["value"]
+        soup = BeautifulSoup(r.text, "html.parser")
+        return soup.find("input", {"name": "fb_dtsg"}).get("value")
     except:
         return None
 
-def send_message(cookie_str, thread_id, message, fb_dtsg):
+def send_msg(cook, uid, msg, token):
     try:
-        url = f"https://mbasic.facebook.com/messages/thread/{thread_id}"
-        session = requests.Session()
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Cookie": cookie_str
-        }
-        res = session.get(url, headers=headers)
+        url = f"https://mbasic.facebook.com/messages/thread/{uid}"
+        s = requests.Session()
+        h = {"Cookie": cook, "User-Agent": "Mozilla/5.0"}
+        res = s.get(url, headers=h)
         soup = BeautifulSoup(res.text, "html.parser")
         form = soup.find("form")
-        if not form:
-            print("❌ Failed to load message form")
-            return
-
-        action_url = form["action"]
+        if not form: return
+        action = form["action"]
         inputs = form.find_all("input")
-        data = {}
-        for input_tag in inputs:
-            name = input_tag.get("name")
-            value = input_tag.get("value", "")
-            if name:
-                data[name] = value
-
-        data["body"] = message
-        session.post("https://mbasic.facebook.com" + action_url, headers=headers, data=data)
-        print("✅ Message sent:", message)
+        data = {i.get("name"): i.get("value", "") for i in inputs if i.get("name")}
+        data["body"] = msg
+        s.post("https://mbasic.facebook.com" + action, headers=h, data=data)
+        print("✅", msg)
     except Exception as e:
-        print("❌ Error:", e)
+        print("❌", e)
 
-def bot_loop():
-    global is_running, stop_flag, cookie, uid, delay, messages
-    fb_dtsg = get_fb_dtsg(cookie)
-    if not fb_dtsg:
-        print("❌ Could not fetch fb_dtsg. Invalid cookie?")
-        is_running = False
+def run_bot():
+    global app_cookie, app_uid, app_delay, app_messages, app_stop, app_running
+    token = get_token(app_cookie)
+    if not token:
+        print("❌ Invalid cookie")
+        app_running = False
         return
-    while not stop_flag:
-        msg = random.choice(messages)
-        send_message(cookie, uid, msg, fb_dtsg)
-        time.sleep(delay)
-    is_running = False
+    while not app_stop:
+        m = random.choice(app_messages)
+        send_msg(app_cookie, app_uid, m, token)
+        time.sleep(app_delay)
+    app_running = False
 
 @app.route("/", methods=["GET", "POST"])
-def index():
-    global is_running, stop_flag, thread
-    global cookie, uid, delay, messages
-
+def main():
+    global app_cookie, app_uid, app_delay, app_messages, app_stop, app_running, app_thread
     if request.method == "POST":
-        cookie = request.form.get("cookie")
-        uid = request.form.get("uid")
-        delay = int(request.form.get("delay", "10"))
+        app_cookie = request.form["cookie"]
+        app_uid = request.form["uid"]
+        app_delay = int(request.form["delay"])
         file = request.files["message_file"]
-        messages = [line.strip() for line in file.read().decode("utf-8").splitlines() if line.strip()]
-
-        if not is_running:
-            stop_flag = False
-            thread = threading.Thread(target=bot_loop)
-            thread.start()
-            is_running = True
-
+        app_messages = [line.strip() for line in file.read().decode().splitlines() if line.strip()]
+        if not app_running:
+            app_stop = False
+            app_thread = threading.Thread(target=run_bot)
+            app_thread.start()
+            app_running = True
         return redirect("/")
-
-    return Response(HTML_PAGE, mimetype='text/html')
+    return Response(HTML, mimetype='text/html')
 
 @app.route("/stop")
 def stop():
-    global stop_flag, is_running
-    stop_flag = True
-    is_running = False
+    global app_stop, app_running
+    app_stop = True
+    app_running = False
     return redirect("/")
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-    
+if __name__ == "__main__":
+    app.run(port=5000)
+      
