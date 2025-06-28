@@ -7,12 +7,10 @@ is_running = False
 stop_flag = False
 thread = None
 
-bot_config = {
-    "cookie": "",
-    "uid": "",
-    "delay": 10,
-    "messages": []
-}
+cookie = ""
+uid = ""
+delay = 10
+messages = []
 
 HTML_PAGE = '''
 <!DOCTYPE html>
@@ -81,11 +79,11 @@ HTML_PAGE = '''
 </html>
 '''
 
-def get_fb_dtsg(cookie):
+def get_fb_dtsg(cookie_str):
     try:
         res = requests.get("https://mbasic.facebook.com/messages", headers={
-            "Cookie": cookie,
-            "User-Agent": "Mozilla/5.0"
+            "Cookie": cookie_str,
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10)"
         })
         soup = BeautifulSoup(res.text, "html.parser")
         token = soup.find("input", {"name": "fb_dtsg"})
@@ -94,13 +92,13 @@ def get_fb_dtsg(cookie):
     except:
         return None
 
-def send_message(cookie, thread_id, message, fb_dtsg):
+def send_message(cookie_str, thread_id, message, fb_dtsg):
     try:
         url = f"https://mbasic.facebook.com/messages/thread/{thread_id}"
         session = requests.Session()
         headers = {
             "User-Agent": "Mozilla/5.0",
-            "Cookie": cookie
+            "Cookie": cookie_str
         }
         res = session.get(url, headers=headers)
         soup = BeautifulSoup(res.text, "html.parser")
@@ -119,39 +117,39 @@ def send_message(cookie, thread_id, message, fb_dtsg):
                 data[name] = value
 
         data["body"] = message
-        send = session.post("https://mbasic.facebook.com" + action_url, headers=headers, data=data)
+        session.post("https://mbasic.facebook.com" + action_url, headers=headers, data=data)
         print("✅ Message sent:", message)
     except Exception as e:
         print("❌ Error:", e)
 
-def bot_thread():
-    global stop_flag, is_running
-    fb_dtsg = get_fb_dtsg(bot_config["cookie"])
+def bot_loop():
+    global is_running, stop_flag, cookie, uid, delay, messages
+    fb_dtsg = get_fb_dtsg(cookie)
     if not fb_dtsg:
         print("❌ Could not fetch fb_dtsg. Invalid cookie?")
         is_running = False
         return
-
     while not stop_flag:
-        msg = random.choice(bot_config["messages"])
-        send_message(bot_config["cookie"], bot_config["uid"], msg, fb_dtsg)
-        time.sleep(bot_config["delay"])
+        msg = random.choice(messages)
+        send_message(cookie, uid, msg, fb_dtsg)
+        time.sleep(delay)
     is_running = False
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global bot_config, is_running, stop_flag, thread
+    global is_running, stop_flag, thread
+    global cookie, uid, delay, messages
 
     if request.method == "POST":
-        bot_config["cookie"] = request.form.get("cookie")
-        bot_config["uid"] = request.form.get("uid")
-        bot_config["delay"] = int(request.form.get("delay", "10"))
+        cookie = request.form.get("cookie")
+        uid = request.form.get("uid")
+        delay = int(request.form.get("delay", "10"))
         file = request.files["message_file"]
-        bot_config["messages"] = [line.strip() for line in file.read().decode("utf-8").splitlines() if line.strip()]
+        messages = [line.strip() for line in file.read().decode("utf-8").splitlines() if line.strip()]
 
         if not is_running:
             stop_flag = False
-            thread = threading.Thread(target=bot_thread)
+            thread = threading.Thread(target=bot_loop)
             thread.start()
             is_running = True
 
