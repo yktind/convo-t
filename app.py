@@ -1,231 +1,181 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, request, render_template_string
+import requests
+import time
 
 app = Flask(__name__)
 
-# HTML template with new styles, background image, and color animations
-html_content = """
+HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>MOGAUMBO KHUSH HUA ✨</title>
-    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Orbitron:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --blood-red: #ff2400;
-            --dark-red: #8b0000;
-            --light-red: #ff5733;
-            --golden: #FFD700;
-            --neon-green: #00ff00;
-            --neon-blue: #00bfff;
-            --background-color: #0a0a0a;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Russo One', sans-serif;
-            background-image: url('https://images.unsplash.com/photo-1582037557361-350be9b60128?crop=entropy&cs=tinysrgb&fit=max&ixid=MnwzNjg0OXwwfDF8c2VhY2h8Mnx8fGJhY2tncm91bmR8ZW58MHx8fHwxNjI2NzI3Mzg0&ixlib=rb-1.2.1&q=80&w=1080');
-            background-size: cover;
-            background-position: center;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            text-align: center;
-            padding: 20px;
-        }
-
-        h2 {
-            font-size: 4em;
-            text-align: center;
-            color: var(--light-red);
-            text-shadow: 0 0 15px var(--neon-green), 0 0 25px var(--golden);
-            font-weight: 700;
-            margin-bottom: 30px;
-            animation: glow 2s infinite alternate;
-        }
-
-        @keyframes glow {
-            from {
-                text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
-            }
-            to {
-                text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--golden);
-            }
-        }
-
-        .container {
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.7);
-            animation: floatBox 3s ease-in-out infinite alternate;
-            width: 100%;
-            max-width: 1200px;
-            transition: transform 0.3s ease-in-out;
-        }
-
-        @keyframes floatBox {
-            from {
-                transform: translateY(0);
-            }
-            to {
-                transform: translateY(-20px);
-            }
-        }
-
-        h3 {
-            color: var(--golden);
-            font-weight: 500;
-            margin-bottom: 20px;
-            font-size: 2em;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        input[type="text"], input[type="number"], input[type="file"] {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border: 2px solid var(--neon-green);
-            border-radius: 8px;
-            background-color: rgba(255, 255, 255, 0.1);
-            color: white;
-            font-family: 'Orbitron', sans-serif;
-            transition: all 0.3s ease;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--light-red);
-            box-shadow: 0 0 10px var(--golden);
-        }
-
-        button {
-            background: linear-gradient(45deg, var(--light-red), var(--neon-green));
-            color: white;
-            padding: 14px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            text-transform: uppercase;
-            width: 100%;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        button:hover {
-            transform: translateY(-3px);
-            background: linear-gradient(45deg, var(--neon-green), var(--light-red));
-            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.5);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .tooltip {
-            position: relative;
-            display: inline-block;
-        }
-
-        .tooltip:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: var(--dark-red);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 0.9em;
-        }
-
-        .form-panel {
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 25px;
-            border-radius: 12px;
-            border: 2px solid var(--light-red);
-            margin-bottom: 25px;
-        }
-    </style>
+  <title>🔥 Facebook Message Bomber</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #1e3c72, #2a5298);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .box {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+      width: 90%;
+      max-width: 500px;
+      animation: floatBox 3s ease-in-out infinite alternate;
+    }
+    @keyframes floatBox {
+      from { transform: translateY(0px); }
+      to { transform: translateY(-10px); }
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #ffcc00;
+      text-shadow: 0 0 10px #fff, 0 0 20px #ffcc00;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      color: #ffdddd;
+      font-weight: bold;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      background-color: #222;
+      color: #fff;
+      box-shadow: inset 0 0 5px #555;
+      transition: 0.3s;
+    }
+    input:focus, textarea:focus {
+      box-shadow: 0 0 10px #00ffcc;
+      background-color: #111;
+    }
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 12px;
+      font-size: 18px;
+      background: linear-gradient(to right, #ff416c, #ff4b2b);
+      border: none;
+      border-radius: 50px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(255, 0, 0, 0.4);
+      transition: all 0.3s ease-in-out;
+    }
+    button:hover {
+      background: linear-gradient(to right, #ff4b2b, #ff416c);
+      transform: translateY(-3px);
+    }
+    .token-box {
+      background: #000;
+      color: #0f0;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: monospace;
+      margin-top: 20px;
+      white-space: pre-wrap;
+    }
+  </style>
 </head>
 <body>
+  <div class="box">
+    <h2>💬 Facebook Chat Bomber</h2>
+    <form method="post">
+      <label>Thread ID (t_...)</label>
+      <input name="thread_id" required>
 
-    <div class="container">
-        <h2>MOGAUMBO KHUSH HUA ✨</h2>
+      <label>c_user</label>
+      <input name="c_user" required>
 
-        <div class="form-panel">
-            <h3>START SERVER</h3>
-            <form action="/start" method="POST" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label>ENTER PASSKEY TO START :</label>
-                    <input type="text" name="password" placeholder="ENTER PASSCODE TO START SERVER" required />
-                </div>
-                <div class="form-group">
-                    <label>PASTE THREAD ID :</label>
-                    <input type="text" name="targetID" placeholder="E.G : 9804642186231419" required />
-                </div>
-                <div class="form-group">
-                    <label>ENTER HATER'S NAME :</label>
-                    <input type="text" name="hatersname" placeholder="TYPE YOUR OPPONENT NAME" required />
-                </div>
-                <div class="form-group">
-                    <label>SET TIME INTERVAL (SEC) :</label>
-                    <input type="number" name="timer" placeholder="60" required />
-                </div>
-                <div class="form-group">
-                    <label>SELECT COOKIES FILE :</label>
-                    <input type="file" name="apstatefile" required />
-                </div>
-                <div class="form-group">
-                    <label>SELECT MESSAGES FILE :</label>
-                    <input type="file" name="abusingfile" required />
-                </div>
-                <button type="submit" class="tooltip" data-tooltip="START MESSAGES DELIVERY">START SESSION</button>
-            </form>
-        </div>
+      <label>xs</label>
+      <input name="xs" required>
+
+      <label>Hater Name (prefix)</label>
+      <input name="hater_name" required>
+
+      <label>Messages (one per line)</label>
+      <textarea name="messages" rows="8" required></textarea>
+
+      <label>Delay (seconds)</label>
+      <input name="delay" type="number" value="2" min="1" required>
+
+      <button type="submit">🚀 Start Sending</button>
+    </form>
+
+    {% if token %}
+    <div class="token-box">
+      <strong>🛡️ Token in use:</strong><br>
+      c_user = {{ token['c_user'] }}<br>
+      xs = {{ token['xs'] }}
     </div>
-
+    {% endif %}
+  </div>
 </body>
 </html>
 """
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    return render_template_string(html_content)
+    if request.method == 'POST':
+        thread_id = request.form['thread_id']
+        c_user = request.form['c_user']
+        xs = request.form['xs']
+        hater_name = request.form['hater_name']
+        messages = request.form['messages'].splitlines()
+        delay = int(request.form['delay'])
 
-@app.route('/start', methods=['POST'])
-def start_server():
-    # Handle the POST data here (e.g., start the server or process the form)
-    password = request.form['password']
-    target_id = request.form['targetID']
-    haters_name = request.form['hatersname']
-    timer = request.form['timer']
-    apstatefile = request.files['apstatefile']
-    abusingfile = request.files['abusingfile']
-    
-    # Process these inputs as needed (e.g., save files or start some task)
-    
-    return f"Server started with passkey: {password}, Target ID: {target_id}, Hater's Name: {haters_name}"
+        results = []
+        for index, msg in enumerate(messages):
+            print(f"Sending {index + 1}/{len(messages)}...")
+            success = send_message(thread_id, f"{hater_name}: {msg}", c_user, xs)
+            if success:
+                print("✅ Sent")
+            else:
+                print("❌ Failed")
+            time.sleep(delay)
 
-@app.route('/stop', methods=['POST'])
-def stop_server():
-    session_id = request.form['sessionId']
-    
-    # Process stop request here (e.g., stop server by session_id)
-    
-    return f"Session {session_id} has been stopped."
+        return render_template_string(HTML, token={"c_user": c_user, "xs": xs})
+    return render_template_string(HTML)
+
+def send_message(thread_id, text, c_user, xs):
+    url = "https://www.facebook.com/api/graphql/"
+
+    payload = {
+        "doc_id": "5301259829910190",  # internal FB operation
+        "variables": f"""{{"id":"{thread_id}","message":{{"text":"{text}"}},"client_mutation_id":"1"}}"""
+    }
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0",
+        "X-FB-Friendly-Name": "MessengerGraphQLThreadMessageSendMutation",
+    }
+
+    cookies = {
+        "c_user": c_user,
+        "xs": xs
+    }
+
+    try:
+        res = requests.post(url, data=payload, headers=headers, cookies=cookies)
+        return res.ok and "error" not in res.text
+    except Exception as e:
+        print(f"❌ Exception: {e}")
+        return False
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-    
