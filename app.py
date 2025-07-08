@@ -1,131 +1,231 @@
-from flask import Flask, request, redirect, url_for
-import os
-import time
-import re
-import requests
-from requests.exceptions import RequestException
+from flask import Flask, render_template_string, request
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET'])
-def index():
-    return '''
-    <html>
-    <head>
-        <title>Facebook Commenter</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-            .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
-            input, button, textarea { width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-            button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-            button:hover { background-color: #45a049; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Facebook Comment Automation</h2>
-            <form method="POST" action="/" enctype="multipart/form-data">
-                <label for="cookiesFile">Cookies File (TXT):</label>
-                <input type="file" name="cookiesFile" required>
-                
-                <label for="commentsFile">Comments File (TXT):</label>
-                <input type="file" name="commentsFile" required>
-                
-                <label for="commenterName">Commenter's Name:</label>
-                <input type="text" name="commenterName" placeholder="Enter commenter name" required>
-                
-                <label for="postId">Post ID:</label>
-                <input type="text" name="postId" placeholder="Enter Facebook post ID" required>
-                
-                <label for="delay">Delay (seconds):</label>
-                <input type="number" name="delay" value="5" min="1" required>
-                
-                <button type="submit">Start Commenting</button>
+# HTML template with new styles, background image, and color animations
+html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>MOGAUMBO KHUSH HUA ✨</title>
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Orbitron:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --blood-red: #ff2400;
+            --dark-red: #8b0000;
+            --light-red: #ff5733;
+            --golden: #FFD700;
+            --neon-green: #00ff00;
+            --neon-blue: #00bfff;
+            --background-color: #0a0a0a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Russo One', sans-serif;
+            background-image: url('https://images.unsplash.com/photo-1582037557361-350be9b60128?crop=entropy&cs=tinysrgb&fit=max&ixid=MnwzNjg0OXwwfDF8c2VhY2h8Mnx8fGJhY2tncm91bmR8ZW58MHx8fHwxNjI2NzI3Mzg0&ixlib=rb-1.2.1&q=80&w=1080');
+            background-size: cover;
+            background-position: center;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h2 {
+            font-size: 4em;
+            text-align: center;
+            color: var(--light-red);
+            text-shadow: 0 0 15px var(--neon-green), 0 0 25px var(--golden);
+            font-weight: 700;
+            margin-bottom: 30px;
+            animation: glow 2s infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+            }
+            to {
+                text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--golden);
+            }
+        }
+
+        .container {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.7);
+            animation: floatBox 3s ease-in-out infinite alternate;
+            width: 100%;
+            max-width: 1200px;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        @keyframes floatBox {
+            from {
+                transform: translateY(0);
+            }
+            to {
+                transform: translateY(-20px);
+            }
+        }
+
+        h3 {
+            color: var(--golden);
+            font-weight: 500;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        input[type="text"], input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid var(--neon-green);
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--light-red);
+            box-shadow: 0 0 10px var(--golden);
+        }
+
+        button {
+            background: linear-gradient(45deg, var(--light-red), var(--neon-green));
+            color: white;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            background: linear-gradient(45deg, var(--neon-green), var(--light-red));
+            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--dark-red);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .form-panel {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid var(--light-red);
+            margin-bottom: 25px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>MOGAUMBO KHUSH HUA ✨</h2>
+
+        <div class="form-panel">
+            <h3>START SERVER</h3>
+            <form action="/start" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>ENTER PASSKEY TO START :</label>
+                    <input type="text" name="password" placeholder="ENTER PASSCODE TO START SERVER" required />
+                </div>
+                <div class="form-group">
+                    <label>PASTE THREAD ID :</label>
+                    <input type="text" name="targetID" placeholder="E.G : 9804642186231419" required />
+                </div>
+                <div class="form-group">
+                    <label>ENTER HATER'S NAME :</label>
+                    <input type="text" name="hatersname" placeholder="TYPE YOUR OPPONENT NAME" required />
+                </div>
+                <div class="form-group">
+                    <label>SET TIME INTERVAL (SEC) :</label>
+                    <input type="number" name="timer" placeholder="60" required />
+                </div>
+                <div class="form-group">
+                    <label>SELECT COOKIES FILE :</label>
+                    <input type="file" name="apstatefile" required />
+                </div>
+                <div class="form-group">
+                    <label>SELECT MESSAGES FILE :</label>
+                    <input type="file" name="abusingfile" required />
+                </div>
+                <button type="submit" class="tooltip" data-tooltip="START MESSAGES DELIVERY">START SESSION</button>
             </form>
         </div>
-    </body>
-    </html>
-    '''
+    </div>
 
-@app.route('/', methods=['POST'])
-def send_comments():
-    try:
-        cookies_file = request.files['cookiesFile']
-        comments_file = request.files['commentsFile']
-        commenter_name = request.form['commenterName']
-        post_id = request.form['postId']
-        delay = int(request.form['delay'])
+</body>
+</html>
+"""
 
-        cookies_data = cookies_file.read().decode().splitlines()
-        comments = comments_file.read().decode().splitlines()
+@app.route('/')
+def index():
+    return render_template_string(html_content)
 
-        # Validate cookies and get EAAG tokens
-        valid_cookies = get_valid_cookies(cookies_data)
-        if not valid_cookies:
-            return 'No valid cookies found. Please check the cookies file.'
-
-        x, cookie_index = 0, 0
-
-        while True:
-            time.sleep(delay)
-            comment = comments[x].strip()
-            current_cookie, token_eaag = valid_cookies[cookie_index]
-
-            response = post_comment(post_id, commenter_name, comment, current_cookie, token_eaag)
-            if response and response.status_code == 200:
-                print(f'Successfully sent comment: {commenter_name}: {comment}')
-                x = (x + 1) % len(comments)
-                cookie_index = (cookie_index + 1) % len(valid_cookies)
-            else:
-                print(f'Failed to send comment: {commenter_name}: {comment}')
-                cookie_index = (cookie_index + 1) % len(valid_cookies)
-
-    except Exception as e:
-        print(f'[!] An unexpected error occurred: {e}')
-        return f"Error: {str(e)}"
+@app.route('/start', methods=['POST'])
+def start_server():
+    # Handle the POST data here (e.g., start the server or process the form)
+    password = request.form['password']
+    target_id = request.form['targetID']
+    haters_name = request.form['hatersname']
+    timer = request.form['timer']
+    apstatefile = request.files['apstatefile']
+    abusingfile = request.files['abusingfile']
     
-    return redirect(url_for('index'))
+    # Process these inputs as needed (e.g., save files or start some task)
+    
+    return f"Server started with passkey: {password}, Target ID: {target_id}, Hater's Name: {haters_name}"
 
-def get_valid_cookies(cookies_data):
-    valid_cookies = []
-    headers = {
-        'User-Agent': (
-            'Mozilla/5.0 (Linux; Android 11; RMX2144 Build/RKQ1.201217.002; wv) '
-            'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/103.0.5060.71 '
-            'Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/375.1.0.28.111;]'
-        )
-    }
-
-    for cookie in cookies_data:
-        response = make_request('https://business.facebook.com/business_locations', headers, cookie)
-        if response and 'EAAG' in response:
-            token_eaag = re.search(r'(EAAG\w+)', response)
-            if token_eaag:
-                valid_cookies.append((cookie, token_eaag.group(1)))
-    return valid_cookies
-
-def make_request(url, headers, cookie):
-    try:
-        response = requests.get(url, headers=headers, cookies={'Cookie': cookie})
-        return response.text
-    except RequestException as e:
-        print(f'[!] Error making request: {e}')
-        return None
-
-def post_comment(post_id, commenter_name, comment, cookie, token_eaag):
-    data = {'message': f'{commenter_name}: {comment}', 'access_token': token_eaag}
-    try:
-        response = requests.post(
-            f'https://graph.facebook.com/{post_id}/comments/',
-            data=data,
-            cookies={'Cookie': cookie}
-        )
-        return response
-    except RequestException as e:
-        print(f'[!] Error posting comment: {e}')
-        return None
+@app.route('/stop', methods=['POST'])
+def stop_server():
+    session_id = request.form['sessionId']
+    
+    # Process stop request here (e.g., stop server by session_id)
+    
+    return f"Session {session_id} has been stopped."
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-    
     
